@@ -748,6 +748,19 @@ window.addEventListener('appinstalled',()=>{
   updateInstallVisibility();
 });
 installButton.addEventListener('click',async()=>{
+  const isKakao=/KAKAOTALK/i.test(navigator.userAgent);
+  if(isKakao && /Android/i.test(navigator.userAgent)){
+    const url='https://gy7604.github.io/worktable/';
+    installHelp.textContent='Chrome에서 설치를 계속해 주세요. 이동하지 않으면 카카오톡 메뉴의 다른 브라우저로 열기를 선택하세요.';
+    installHelp.hidden=false;
+    window.location.href='intent://gy7604.github.io/worktable/#Intent;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.android.chrome;S.browser_fallback_url='+encodeURIComponent(url)+';end';
+    return;
+  }
+  if(isKakao){
+    installHelp.textContent='카카오톡 메뉴에서 Safari 또는 다른 브라우저로 열기를 선택한 뒤, 공유 버튼 → 홈 화면에 추가를 눌러 주세요.';
+    installHelp.hidden=false;
+    return;
+  }
   if(installPrompt){
     const prompt=installPrompt;
     installPrompt=null;
