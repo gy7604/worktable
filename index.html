@@ -7,7 +7,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="근무배치표">
-<link rel="manifest" href="manifest.json">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
 <title>근무배치표</title>
 <style>
 :root {
@@ -715,7 +716,7 @@ renderCalendar();
 
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-navigator.serviceWorker.register('./service-worker.js', { scope: '/shift/' })
+navigator.serviceWorker.register('./service-worker.js', { scope: '/worktable/', updateViaCache: 'none' })
       .catch(e=>console.log('SW 등록 실패:',e));
   });
 }
