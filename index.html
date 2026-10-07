@@ -297,6 +297,11 @@ body {
 .leg-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+.install-panel { margin:12px 14px 0; }
+.install-panel[hidden] { display:none; }
+.install-button { width:100%; padding:11px 16px; border:0; border-radius:9px; background:var(--steel); color:#fff; font:inherit; font-weight:700; cursor:pointer; }
+.install-button:focus-visible { outline:3px solid #E8AD24; outline-offset:2px; }
+.install-help { margin-top:8px; color:var(--ink-sub); font-size:12px; line-height:1.6; }
 </style>
 </head>
 <body>
@@ -313,6 +318,11 @@ body {
         <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
       </svg>
     </button>
+  </div>
+
+  <div class="install-panel" id="install-panel" hidden>
+    <button type="button" class="install-button" id="btn-install">↓ 근무배치표 앱 설치</button>
+    <p class="install-help" id="install-help" role="status" hidden></p>
   </div>
 
   <!-- 내 근무 카드 -->
@@ -713,6 +723,54 @@ document.getElementById('today-label').textContent=
 runSimUntil(new Date(viewYear,viewMonth,0));
 renderMyCard();
 renderCalendar();
+
+
+const installPanel=document.getElementById('install-panel');
+const installButton=document.getElementById('btn-install');
+const installHelp=document.getElementById('install-help');
+const standaloneQuery=window.matchMedia('(display-mode: standalone)');
+let installPrompt=null;
+let installedInThisPage=false;
+function updateInstallVisibility(){
+  installPanel.hidden=installedInThisPage||standaloneQuery.matches||navigator.standalone===true;
+}
+updateInstallVisibility();
+standaloneQuery.addEventListener('change',updateInstallVisibility);
+window.addEventListener('beforeinstallprompt',event=>{
+  event.preventDefault();
+  installPrompt=event;
+  installHelp.hidden=true;
+  updateInstallVisibility();
+});
+window.addEventListener('appinstalled',()=>{
+  installedInThisPage=true;
+  installPrompt=null;
+  updateInstallVisibility();
+});
+installButton.addEventListener('click',async()=>{
+  if(installPrompt){
+    const prompt=installPrompt;
+    installPrompt=null;
+    installButton.disabled=true;
+    try{
+      await prompt.prompt();
+      const choice=await prompt.userChoice;
+      if(choice.outcome==='accepted'){
+        installHelp.textContent='설치 요청을 보냈습니다. 완료되면 홈 화면이나 앱 목록에서 근무배치표를 열어 주세요.';
+        installHelp.hidden=false;
+      }
+    }catch(error){
+      installHelp.textContent='브라우저 메뉴에서 홈 화면에 추가 → 설치를 선택해 주세요.';
+      installHelp.hidden=false;
+    }finally{installButton.disabled=false;}
+    return;
+  }
+  const ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  installHelp.textContent=ios
+    ? 'Safari에서 공유 버튼 → 홈 화면에 추가를 선택해 주세요.'
+    : 'Chrome의 ⋮ 메뉴 → 홈 화면에 추가 → 설치를 선택해 주세요. 앱 안의 브라우저라면 먼저 ⋮ → Chrome에서 열기를 선택하세요. 이미 설치했다면 홈 화면이나 앱 목록에서 근무배치표를 열어 주세요.';
+  installHelp.hidden=false;
+});
 
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
