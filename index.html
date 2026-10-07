@@ -1,0 +1,724 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1E3A6E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="근무배치표">
+<link rel="manifest" href="manifest.json">
+<title>근무배치표</title>
+<style>
+:root {
+  --steel:      #1E3A6E;
+  --steel-mid:  #2B5299;
+  --steel-lt:   #D6E4F7;
+  --day-hd:     #4A7CC7;
+  --night-hd:   #6B4FA8;
+  --bg:         #F0F3F9;
+  --surface:    #FFFFFF;
+  --ink:        #1C2333;
+  --ink-sub:    #5A6478;
+  --border:     #C8D0E0;
+  --off-bg:     #EEF1F6;
+
+  --c-ccr1:     #1A56DB;
+  --c-ccr2:     #0B7A56;
+  --c-kiln:     #B45309;
+  --c-pellet:   #6D28D9;
+  --c-clean:    #BE185D;
+
+  --font: "Pretendard","Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bot: env(safe-area-inset-bottom, 0px);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── 앱 래퍼 ── */
+.app {
+  display: flex; flex-direction: column;
+  min-height: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  background: var(--surface);
+}
+
+/* ── 앱 바 ── */
+.app-bar {
+  background: var(--steel);
+  color: #fff;
+  padding: calc(12px + var(--safe-top)) 16px 12px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 100;
+}
+.app-bar-left h1 { font-size: 16px; font-weight: 700; letter-spacing: -.3px; }
+.app-bar-left p  { font-size: 11px; opacity: .65; margin-top: 2px; }
+.btn-icon {
+  background: rgba(255,255,255,.15); border: none; color: #fff;
+  width: 34px; height: 34px; border-radius: 50%;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  font-size: 17px; flex-shrink: 0;
+}
+.btn-icon:hover { background: rgba(255,255,255,.28); }
+
+/* ── 내 근무 카드 ── */
+.my-card {
+  margin: 14px 14px 0;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 10px rgba(30,58,110,.08);
+}
+.my-card-head {
+  background: linear-gradient(135deg, var(--steel) 0%, var(--steel-mid) 100%);
+  color: #fff;
+  padding: 11px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.my-card-head .date-str { font-size: 11px; opacity: .7; }
+.my-card-head .name-str { font-size: 14px; font-weight: 700; }
+.my-card-body {
+  background: var(--surface);
+  padding: 14px 16px;
+  display: flex; align-items: center; gap: 14px;
+}
+.my-badge {
+  width: 52px; height: 52px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 800; text-align: center; line-height: 1.3;
+  flex-shrink: 0;
+}
+.my-info-pos  { font-size: 20px; font-weight: 800; line-height: 1.1; }
+.my-info-shift{ font-size: 11px; color: var(--ink-sub); margin-top: 4px; }
+.my-info-off  { font-size: 17px; font-weight: 700; color: var(--ink-sub); }
+.my-no-name   { text-align: center; width: 100%; padding: 14px 0; color: var(--ink-sub); font-size: 12px; font-weight: 600; }
+
+/* ── 달력 영역 ── */
+.cal-section { padding: 14px 10px 32px; }
+.cal-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px; padding: 0 2px;
+}
+.cal-nav-title { font-size: 15px; font-weight: 700; color: var(--ink); }
+.cal-nav-btn {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 7px; width: 30px; height: 30px;
+  cursor: pointer; font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink-sub);
+}
+.cal-nav-btn:hover { background: var(--steel-lt); color: var(--steel); }
+
+/* ── 요일 헤더 ── */
+.cal-dow {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 2px; margin-bottom: 2px;
+}
+.cal-dow span {
+  text-align: center; font-size: 10px; font-weight: 700;
+  color: var(--ink-sub); padding: 3px 0;
+  background: var(--bg); border-radius: 4px;
+}
+.cal-dow span:first-child { color: #C81E1E; }
+.cal-dow span:last-child  { color: var(--steel-mid); }
+
+/* ── 달력 그리드 ── */
+.cal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+/* ── 날짜 셀 ── */
+.day-cell {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  cursor: pointer;
+  background: var(--surface);
+  min-height: 0;
+}
+.day-cell:active { opacity: .85; }
+.day-cell.empty  { background: transparent; border-color: transparent; pointer-events: none; }
+.day-cell.is-today { outline: 2px solid var(--steel); outline-offset: -1px; }
+.day-cell.is-mine  { background: #EEF4FF; }
+
+/* 날짜+근무유형 헤더 행 */
+.cell-head {
+  padding: 3px 5px;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 1px;
+}
+.cell-head.hd-day   { background: var(--day-hd);   color: #fff; }
+.cell-head.hd-night { background: var(--night-hd); color: #fff; }
+.cell-head.hd-off   { background: var(--off-bg);   color: var(--ink-sub); }
+
+.cell-date-row {
+  display: flex; align-items: baseline; gap: 3px;
+}
+.cell-date-num {
+  font-size: 12px; font-weight: 700; line-height: 1;
+}
+.cell-date-num.sun { color: #FFAAAA; }
+.cell-date-num.sat { color: #AACCFF; }
+.cell-date-num.hd-off-sun { color: #C81E1E; }
+.cell-date-num.hd-off-sat { color: var(--steel-mid); }
+
+.cell-shift-label {
+  font-size: 9px; font-weight: 700; opacity: .9;
+}
+
+/* 포지션 목록 */
+.cell-body { flex: 1; padding: 3px 0 3px; }
+
+/* 휴무 셀 */
+.cell-off-text {
+  display: flex; align-items: center; justify-content: center;
+  height: 100%; min-height: 60px;
+  font-size: 11px; font-weight: 700; color: var(--ink-sub);
+}
+
+/* 포지션 행 */
+.p-row {
+  display: flex; align-items: center;
+  padding: 1px 5px;
+  gap: 3px;
+  border-bottom: 1px solid #F0F2F6;
+}
+.p-row:last-child { border-bottom: none; }
+
+.p-label {
+  font-size: 8px; font-weight: 700;
+  min-width: 20px; flex-shrink: 0;
+  white-space: nowrap;
+}
+.pl-ccr1   { color: var(--c-ccr1); }
+.pl-ccr2   { color: var(--c-ccr2); }
+.pl-kiln   { color: var(--c-kiln); }
+.pl-pellet { color: var(--c-pellet); }
+.pl-clean  { color: var(--c-clean); }
+
+.p-name {
+  font-size: 9px; font-weight: 600; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.p-name.mine {
+  color: var(--steel); font-weight: 800;
+  text-decoration: underline; text-underline-offset: 2px;
+}
+
+/* ── 이름 선택 모달 ── */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.45); z-index: 200;
+  align-items: flex-end; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal-sheet {
+  background: var(--surface); border-radius: 18px 18px 0 0;
+  width: 100%; max-width: 600px;
+  padding: 18px 18px calc(18px + var(--safe-bot));
+}
+.modal-handle {
+  width: 34px; height: 4px; background: var(--border);
+  border-radius: 2px; margin: 0 auto 16px;
+}
+.modal-title { font-size: 14px; font-weight: 700; margin-bottom: 12px; }
+.name-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+.name-btn {
+  padding: 12px 6px; border: 2px solid var(--border);
+  border-radius: 10px; background: var(--surface);
+  font-size: 14px; font-weight: 600; font-family: var(--font);
+  color: var(--ink); cursor: pointer; text-align: center;
+}
+.name-btn:hover  { border-color: var(--steel-mid); background: var(--steel-lt); }
+.name-btn.active { border-color: var(--steel); background: var(--steel); color: #fff; }
+
+/* ── 상세 바텀시트 ── */
+.detail-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.4); z-index: 200;
+  align-items: flex-end; justify-content: center;
+}
+.detail-overlay.open { display: flex; }
+.detail-sheet {
+  background: var(--surface); border-radius: 18px 18px 0 0;
+  width: 100%; max-width: 600px;
+  padding: 18px 18px calc(22px + var(--safe-bot));
+}
+.detail-date-str  { font-size: 12px; color: var(--ink-sub); margin-bottom: 3px; }
+.detail-shift-str { font-size: 17px; font-weight: 700; margin-bottom: 14px; }
+.detail-rows { display: flex; flex-direction: column; gap: 7px; }
+.d-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px; border-radius: 10px;
+}
+.d-row-label { font-size: 11px; font-weight: 700; min-width: 52px; flex-shrink: 0; }
+.d-row-name  { font-size: 15px; font-weight: 600; color: var(--ink); }
+.d-row-name.mine { color: var(--steel); }
+.mine-tag {
+  display: inline-block; font-size: 10px; font-weight: 700;
+  background: var(--steel); color: #fff;
+  padding: 1px 6px; border-radius: 4px; margin-left: 6px;
+}
+.dr-ccr1   { background: #EBF2FF; } .dl-ccr1   { color: var(--c-ccr1); }
+.dr-ccr2   { background: #E6F7F1; } .dl-ccr2   { color: var(--c-ccr2); }
+.dr-kiln   { background: #FEF3E2; } .dl-kiln   { color: var(--c-kiln); }
+.dr-pellet { background: #F3EEFF; } .dl-pellet { color: var(--c-pellet); }
+.dr-clean  { background: #FDE8F2; } .dl-clean  { color: var(--c-clean); }
+.dr-off    { background: var(--off-bg); }
+
+.btn-close {
+  width: 100%; margin-top: 14px; padding: 12px;
+  background: var(--bg); border: none; border-radius: 10px;
+  font-size: 13px; font-weight: 600; font-family: var(--font);
+  color: var(--ink-sub); cursor: pointer;
+}
+.btn-close:hover { background: var(--steel-lt); color: var(--steel); }
+
+/* ── 범례 ── */
+.legend {
+  display: flex; flex-wrap: wrap; gap: 5px 12px;
+  padding: 10px 14px 14px;
+  border-top: 1px solid var(--border);
+}
+.leg { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--ink-sub); }
+.leg-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- 앱 바 -->
+  <div class="app-bar">
+    <div class="app-bar-left">
+      <h1>근무배치표</h1>
+      <p id="today-label"></p>
+    </div>
+    <button class="btn-icon" id="btn-select-name" title="내 이름 선택">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- 내 근무 카드 -->
+  <div class="my-card" id="my-card"></div>
+
+  <!-- 달력 -->
+  <div class="cal-section">
+    <div class="cal-nav">
+      <button class="cal-nav-btn" id="btn-prev">&#8249;</button>
+      <div class="cal-nav-title" id="cal-title"></div>
+      <button class="cal-nav-btn" id="btn-next">&#8250;</button>
+    </div>
+    <div class="cal-dow">
+      <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+    </div>
+    <div class="cal-grid" id="cal-grid"></div>
+  </div>
+
+  <!-- 범례 -->
+  <div class="legend">
+    <div class="leg"><span class="leg-dot" style="background:var(--c-ccr1)"></span>CCR 1기</div>
+    <div class="leg"><span class="leg-dot" style="background:var(--c-ccr2)"></span>CCR 2기</div>
+    <div class="leg"><span class="leg-dot" style="background:var(--c-kiln)"></span>Kiln</div>
+    <div class="leg"><span class="leg-dot" style="background:var(--c-pellet)"></span>Pellet</div>
+    <div class="leg"><span class="leg-dot" style="background:var(--c-clean)"></span>청정</div>
+    <div class="leg"><span style="display:inline-block;width:12px;height:7px;border-radius:2px;background:var(--day-hd)"></span>주간</div>
+    <div class="leg"><span style="display:inline-block;width:12px;height:7px;border-radius:2px;background:var(--night-hd)"></span>야간</div>
+  </div>
+
+</div>
+
+<!-- 이름 선택 모달 -->
+<div class="modal-overlay" id="name-modal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">내 이름을 선택하세요</div>
+    <div class="name-grid" id="name-grid"></div>
+  </div>
+</div>
+
+<!-- 상세 바텀시트 -->
+<div class="detail-overlay" id="detail-modal">
+  <div class="detail-sheet">
+    <div class="modal-handle"></div>
+    <div class="detail-date-str"  id="detail-date"></div>
+    <div class="detail-shift-str" id="detail-title"></div>
+    <div class="detail-rows"      id="detail-rows"></div>
+    <button class="btn-close" id="btn-detail-close">닫기</button>
+  </div>
+</div>
+
+<script>
+// =============================================
+// 근무 계산 엔진
+// =============================================
+const MEMBERS    = ['이영식','강신혁','김영진','장경준','홍찬표'];
+const PATTERN    = ['D','D','O','O','N','N','O','O'];
+const BASE_DATE  = new Date(2026, 9, 1);
+const BASE_PHASE = 7;
+const CYCLE_BASE = new Date(2026, 9, 2);
+const BASE_FIELD = ['Kiln','Pellet','청정'];
+
+function dayDiff(a,b){ return Math.round((a-b)/86400000); }
+function getPhase(d){ return ((BASE_PHASE+dayDiff(d,BASE_DATE))%8+8)%8; }
+function getShift(d){ return PATTERN[getPhase(d)]; }
+function getCycleInfo(d){
+  const diff=dayDiff(d,CYCLE_BASE);
+  if(diff<0)return null;
+  return{cycle:Math.floor(diff/8),cyclePhase:diff%8};
+}
+function dateKey(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function prevInOrder(name){
+  const i=MEMBERS.indexOf(name);
+  return MEMBERS[(i-1+5)%5];
+}
+
+// 시뮬레이션 캐시
+const cache={};
+// 시뮬레이션 지속 상태 (10/2부터 누적)
+let simState=null;
+
+function initSimState(){
+  return{
+    ccrState:{ccr1:'강신혁',ccr2:'김영진'},
+    nextStartIdx:{이영식:1,강신혁:0,김영진:2,장경준:0,홍찬표:2},
+    lastCPK:null,
+    lastDate:null
+  };
+}
+
+function runSimUntil(targetDate){
+  if(!simState) simState=initSimState();
+  // 이미 계산된 날짜면 스킵
+  if(simState.lastDate && simState.lastDate>=targetDate) return;
+
+  let cur=simState.lastDate
+    ? new Date(simState.lastDate.getTime()+86400000)
+    : new Date(CYCLE_BASE);
+
+  while(cur<=targetDate){
+    const shift=getShift(cur);
+    const key=dateKey(cur);
+    if(shift==='O'){
+      cache[key]={shift:'O'};
+    } else {
+      const info=getCycleInfo(cur);
+      const cpk=info.cycle+'_'+shift;
+      if(cpk!==simState.lastCPK){
+        simState.lastCPK=cpk;
+        if(!(info.cycle===0&&shift==='D')){
+          const out=simState.ccrState.ccr2;
+          const newCCR1=prevInOrder(simState.ccrState.ccr1);
+          simState.nextStartIdx[out]=simState.nextStartIdx[newCCR1];
+          simState.ccrState={ccr1:newCCR1,ccr2:simState.ccrState.ccr1};
+        }
+      }
+      const field=MEMBERS.filter(m=>m!==simState.ccrState.ccr1&&m!==simState.ccrState.ccr2);
+      const pm={'Kiln':null,'Pellet':null,'청정':null};
+      field.forEach(m=>{ pm[BASE_FIELD[simState.nextStartIdx[m]]]=m; });
+      cache[key]={
+        shift,
+        ccr1:simState.ccrState.ccr1,
+        ccr2:simState.ccrState.ccr2,
+        kiln:pm['Kiln']||'-',
+        pellet:pm['Pellet']||'-',
+        clean:pm['청정']||'-',
+      };
+      field.forEach(m=>{ simState.nextStartIdx[m]=(simState.nextStartIdx[m]+2)%3; });
+    }
+    simState.lastDate=new Date(cur);
+    cur=new Date(cur.getTime()+86400000);
+  }
+}
+
+function getAsgn(date){
+  const key=dateKey(date);
+  if(!cache[key]){
+    const end=new Date(date.getFullYear(),date.getMonth()+1,0);
+    runSimUntil(end);
+  }
+  return cache[key]||{shift:'O'};
+}
+
+function getMyPos(asgn,name){
+  if(!asgn||asgn.shift==='O'||!name)return null;
+  if(asgn.ccr1===name)return'CCR 1기';
+  if(asgn.ccr2===name)return'CCR 2기';
+  if(asgn.kiln===name)return'Kiln';
+  if(asgn.pellet===name)return'Pellet';
+  if(asgn.clean===name)return'청정';
+  return null;
+}
+
+// =============================================
+// 앱 상태
+// =============================================
+const today=new Date(); today.setHours(0,0,0,0);
+let viewYear=today.getFullYear();
+let viewMonth=today.getMonth()+1;
+let myName=null;
+
+const WDAYS=['일','월','화','수','목','금','토'];
+const MNAMES=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+
+const POS_DEFS=[
+  {key:'ccr1',  label:'1기',  plCls:'pl-ccr1',  drCls:'dr-ccr1',  dlCls:'dl-ccr1',  bgVar:'#EBF2FF',colVar:'var(--c-ccr1)'},
+  {key:'ccr2',  label:'2기',  plCls:'pl-ccr2',  drCls:'dr-ccr2',  dlCls:'dl-ccr2',  bgVar:'#E6F7F1',colVar:'var(--c-ccr2)'},
+  {key:'kiln',  label:'Kiln', plCls:'pl-kiln',  drCls:'dr-kiln',  dlCls:'dl-kiln',  bgVar:'#FEF3E2',colVar:'var(--c-kiln)'},
+  {key:'pellet',label:'Pellet',plCls:'pl-pellet',drCls:'dr-pellet',dlCls:'dl-pellet',bgVar:'#F3EEFF',colVar:'var(--c-pellet)'},
+  {key:'clean', label:'청정', plCls:'pl-clean', drCls:'dr-clean', dlCls:'dl-clean', bgVar:'#FDE8F2',colVar:'var(--c-clean)'},
+];
+
+// =============================================
+// 내 근무 카드
+// =============================================
+function renderMyCard(){
+  const card=document.getElementById('my-card');
+  const asgn=getAsgn(today);
+  const pos=getMyPos(asgn,myName);
+  const shiftTxt=asgn.shift==='D'?'주간 (07:00–19:00)':asgn.shift==='N'?'야간 (19:00–07:00)':'휴무';
+  const todayStr=`${today.getFullYear()}년 ${today.getMonth()+1}월 ${today.getDate()}일 (${WDAYS[today.getDay()]})`;
+
+  let bodyHtml='';
+  if(!myName){
+    bodyHtml=`<div class="my-card-body"><div class="my-no-name">우측 상단 버튼을 눌러 내 이름을 선택하세요</div></div>`;
+  } else if(!pos){
+    bodyHtml=`<div class="my-card-body">
+      <div class="my-badge" style="background:var(--off-bg);color:var(--ink-sub);font-size:20px;">😴</div>
+      <div><div class="my-info-off">휴무</div><div class="my-info-shift">오늘은 쉬는 날입니다</div></div>
+    </div>`;
+  } else {
+    const def=POS_DEFS.find(d=>
+      (d.key==='ccr1'&&pos==='CCR 1기')||(d.key==='ccr2'&&pos==='CCR 2기')||
+      (d.key==='kiln'&&pos==='Kiln')||(d.key==='pellet'&&pos==='Pellet')||(d.key==='clean'&&pos==='청정')
+    );
+    bodyHtml=`<div class="my-card-body">
+      <div class="my-badge" style="background:${def.bgVar};color:${def.colVar};">${pos}</div>
+      <div>
+        <div class="my-info-pos" style="color:${def.colVar};">${pos}</div>
+        <div class="my-info-shift">${shiftTxt}</div>
+      </div>
+    </div>`;
+  }
+
+  card.innerHTML=`
+    <div class="my-card-head">
+      <span class="date-str">${todayStr}</span>
+      <span class="name-str">${myName||'이름 미선택'}</span>
+    </div>${bodyHtml}`;
+}
+
+// =============================================
+// 달력 렌더링
+// =============================================
+function renderCalendar(){
+  const end=new Date(viewYear,viewMonth,0);
+  runSimUntil(end);
+
+  const grid=document.getElementById('cal-grid');
+  grid.innerHTML='';
+  document.getElementById('cal-title').textContent=`${viewYear}년 ${MNAMES[viewMonth-1]}`;
+
+  const firstDay=new Date(viewYear,viewMonth-1,1).getDay();
+  const lastDate=new Date(viewYear,viewMonth,0).getDate();
+
+  // 빈 셀
+  for(let i=0;i<firstDay;i++){
+    const e=document.createElement('div');
+    e.className='day-cell empty';
+    grid.appendChild(e);
+  }
+
+  for(let d=1;d<=lastDate;d++){
+    const date=new Date(viewYear,viewMonth-1,d);
+    const dow=date.getDay();
+    const asgn=getAsgn(date);
+    const shift=asgn.shift;
+    const isToday=date.getTime()===today.getTime();
+    const myPos=getMyPos(asgn,myName);
+
+    const cell=document.createElement('div');
+    cell.className='day-cell'+(isToday?' is-today':'')+(myPos?' is-mine':'');
+
+    // ── 셀 헤더 (날짜 + 근무유형) ──
+    const head=document.createElement('div');
+    const hdCls=shift==='D'?'hd-day':shift==='N'?'hd-night':'hd-off';
+    head.className='cell-head '+hdCls;
+
+    // 날짜 숫자
+    const dateRow=document.createElement('div');
+    dateRow.className='cell-date-row';
+
+    const numEl=document.createElement('span');
+    // 헤더 배경에 따라 색 클래스 분기
+    if(shift==='O'){
+      numEl.className='cell-date-num'+(dow===0?' hd-off-sun':dow===6?' hd-off-sat':'');
+    } else {
+      numEl.className='cell-date-num'+(dow===0?' sun':dow===6?' sat':'');
+    }
+    numEl.textContent=d;
+    dateRow.appendChild(numEl);
+    head.appendChild(dateRow);
+
+    // 근무유형 라벨
+    if(shift!=='O'){
+      const lbl=document.createElement('span');
+      lbl.className='cell-shift-label';
+      lbl.textContent=shift==='D'?'주간':'야간';
+      head.appendChild(lbl);
+    }
+    cell.appendChild(head);
+
+    // ── 셀 바디 ──
+    const body=document.createElement('div');
+    body.className='cell-body';
+
+    if(shift==='O'){
+      const offTxt=document.createElement('div');
+      offTxt.className='cell-off-text';
+      offTxt.textContent='휴무';
+      body.appendChild(offTxt);
+    } else {
+      POS_DEFS.forEach(def=>{
+        const row=document.createElement('div');
+        row.className='p-row';
+
+        const lbl=document.createElement('span');
+        lbl.className='p-label '+def.plCls;
+        lbl.textContent=def.label;
+
+        const nm=document.createElement('span');
+        const memberName=asgn[def.key];
+        const isMineRow=myName&&memberName===myName;
+        nm.className='p-name'+(isMineRow?' mine':'');
+        nm.textContent=memberName;
+
+        row.appendChild(lbl);
+        row.appendChild(nm);
+        body.appendChild(row);
+      });
+    }
+
+    cell.appendChild(body);
+    cell.addEventListener('click',()=>openDetail(date,asgn));
+    grid.appendChild(cell);
+  }
+}
+
+// =============================================
+// 상세 바텀시트
+// =============================================
+const DETAIL_LABELS={ccr1:'CCR 1기',ccr2:'CCR 2기',kiln:'Kiln',pellet:'Pellet',clean:'청정'};
+
+function openDetail(date,asgn){
+  const dow=date.getDay();
+  const shiftTxt=asgn.shift==='D'?'주간 근무 (07:00–19:00)':asgn.shift==='N'?'야간 근무 (19:00–07:00)':'휴무';
+  document.getElementById('detail-date').textContent=
+    `${date.getFullYear()}년 ${date.getMonth()+1}월 ${date.getDate()}일 (${WDAYS[dow]})`;
+  document.getElementById('detail-title').textContent=shiftTxt;
+
+  const rowsEl=document.getElementById('detail-rows');
+  rowsEl.innerHTML='';
+
+  if(asgn.shift==='O'){
+    rowsEl.innerHTML='<div style="text-align:center;padding:18px;color:var(--ink-sub);font-size:13px;">전원 휴무</div>';
+  } else {
+    POS_DEFS.forEach(def=>{
+      const mn=asgn[def.key];
+      const isMine=myName&&mn===myName;
+      const row=document.createElement('div');
+      row.className='d-row '+def.drCls;
+      row.innerHTML=`
+        <span class="d-row-label ${def.dlCls}">${DETAIL_LABELS[def.key]}</span>
+        <span class="d-row-name${isMine?' mine':''}">${mn}${isMine?'<span class="mine-tag">나</span>':''}</span>`;
+      rowsEl.appendChild(row);
+    });
+  }
+  document.getElementById('detail-modal').classList.add('open');
+}
+
+// =============================================
+// 이름 선택
+// =============================================
+function renderNameGrid(){
+  const grid=document.getElementById('name-grid');
+  grid.innerHTML='';
+  MEMBERS.forEach(m=>{
+    const btn=document.createElement('button');
+    btn.className='name-btn'+(myName===m?' active':'');
+    btn.textContent=m;
+    btn.addEventListener('click',()=>{
+      myName=m;
+      document.querySelectorAll('.name-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      setTimeout(()=>{
+        document.getElementById('name-modal').classList.remove('open');
+        renderMyCard();
+        renderCalendar();
+      },180);
+    });
+    grid.appendChild(btn);
+  });
+}
+
+// =============================================
+// 이벤트
+// =============================================
+document.getElementById('btn-select-name').addEventListener('click',()=>{
+  renderNameGrid();
+  document.getElementById('name-modal').classList.add('open');
+});
+document.getElementById('name-modal').addEventListener('click',e=>{
+  if(e.target===document.getElementById('name-modal'))
+    document.getElementById('name-modal').classList.remove('open');
+});
+document.getElementById('detail-modal').addEventListener('click',e=>{
+  if(e.target===document.getElementById('detail-modal'))
+    document.getElementById('detail-modal').classList.remove('open');
+});
+document.getElementById('btn-detail-close').addEventListener('click',()=>{
+  document.getElementById('detail-modal').classList.remove('open');
+});
+document.getElementById('btn-prev').addEventListener('click',()=>{
+  viewMonth--; if(viewMonth<1){viewMonth=12;viewYear--;} renderCalendar();
+});
+document.getElementById('btn-next').addEventListener('click',()=>{
+  viewMonth++; if(viewMonth>12){viewMonth=1;viewYear++;} renderCalendar();
+});
+
+// =============================================
+// 초기화
+// =============================================
+document.getElementById('today-label').textContent=
+  `${today.getFullYear()}년 ${today.getMonth()+1}월 ${today.getDate()}일 (${WDAYS[today.getDay()]})`;
+
+runSimUntil(new Date(viewYear,viewMonth,0));
+renderMyCard();
+renderCalendar();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+navigator.serviceWorker.register('./service-worker.js', { scope: '/shift/' })
+      .catch(e=>console.log('SW 등록 실패:',e));
+  });
+}
+</script>
+</body>
+</html>
