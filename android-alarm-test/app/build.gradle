@@ -2,6 +2,6 @@ plugins { id 'com.android.application' }
 android {
  namespace 'io.github.gy7604.alarmtest'
  compileSdk 35
- defaultConfig { applicationId 'io.github.gy7604.alarmtest'; minSdk 23; targetSdk 35; versionCode 4; versionName '0.4-alarm-screen' }
+ defaultConfig { applicationId 'io.github.gy7604.alarmtest'; minSdk 23; targetSdk 35; versionCode 5; versionName '0.5-alarm-check' }
  compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
