@@ -22,8 +22,9 @@ begin
  s:=public.app_session_verify(p_session_hash);
  if s->>'status' is distinct from 'ok' then return jsonb_build_object('status','invalid'); end if;
  uid:=(s->'user'->>'id')::bigint;
+ if uid<>29 then return jsonb_build_object('status','invalid'); end if;
  if p_code_hash !~ '^[0-9a-f]{64}$' then return jsonb_build_object('status','invalid'); end if;
- delete from private.alarm_pairings where user_id=uid;
+ update private.alarm_pairings set consumed_at=coalesce(consumed_at,now()), expires_at=least(expires_at,now()) where user_id=uid;
  insert into private.alarm_pairings select p_code_hash,u.id,u.credential_version,now()+interval '10 minutes',null from public.app_users u where u.id=uid;
  return jsonb_build_object('status','ok');
 end $$;
@@ -34,7 +35,7 @@ begin
  if p_device_hash !~ '^[0-9a-f]{64}$' then return jsonb_build_object('status','invalid'); end if;
  select * into p from private.alarm_pairings where code_hash=p_code_hash and consumed_at is null and expires_at>now() for update;
  if not found then return jsonb_build_object('status','invalid'); end if;
- select * into u from public.app_users where id=p.user_id and is_active and credential_version=p.credential_version;
+ select * into u from public.app_users where id=p.user_id and id=29 and is_active and credential_version=p.credential_version;
  if not found then return jsonb_build_object('status','invalid'); end if;
  update private.alarm_pairings set consumed_at=now() where code_hash=p_code_hash;
  insert into private.alarm_devices(token_hash,user_id,credential_version) values(p_device_hash,u.id,u.credential_version);
@@ -44,7 +45,7 @@ create or replace function public.app_alarm_read(p_device_hash text) returns jso
 language plpgsql security definer set search_path='' as $$
 declare u public.app_users; today date:=(now() at time zone 'Asia/Seoul')::date;
 begin
- select a.* into u from private.alarm_devices d join public.app_users a on a.id=d.user_id where d.token_hash=p_device_hash and d.revoked_at is null and a.is_active and d.credential_version=a.credential_version;
+ select a.* into u from private.alarm_devices d join public.app_users a on a.id=d.user_id where d.token_hash=p_device_hash and d.revoked_at is null and a.id=29 and a.is_active and d.credential_version=a.credential_version;
  if not found then return jsonb_build_object('status','invalid'); end if;
  return jsonb_build_object('status','ok','today',today,'name',u.name,'team',u.team,'requests',coalesce((
  select jsonb_agg(jsonb_build_object('date',r.shift_date,'shift',r.shift_type,'off',r.request_kind='off' and (r.requested_by_id=u.id or (r.requested_by_id is null and r.requested_by=u.name and (select count(*) from public.app_users a where a.name=u.name)=1)),'substitute',r.status='FILLED' and (r.filled_by_id=u.id or (r.filled_by_id is null and r.filled_by=u.name and (select count(*) from public.app_users a where a.name=u.name)=1))))
