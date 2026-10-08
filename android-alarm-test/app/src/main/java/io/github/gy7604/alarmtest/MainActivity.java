@@ -12,6 +12,8 @@ public class MainActivity extends Activity {
   button(box,"지금 일정 동기화",()->background(()->AlarmStore.sync(this)));
   button(box,"예약 일정·알람 상태 확인",()->showSchedule());
   button(box,"알림·정확한 알람 권한",this::permissionSettings);
+  button(box,"알람 작동 점검",this::diagnostics);
+  button(box,"배터리·백그라운드 설정",()->startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName()))));
   button(box,"2분 뒤 테스트 알람",()->{if(!permissions()){permissionSettings();return;}AlarmStore.set(this,AlarmStore.TEST,System.currentTimeMillis()+120000L,"2분 테스트 알람");status.setText("2분 뒤 테스트 알람을 등록했습니다.");});
   button(box,"테스트 알람 취소",()->{AlarmStore.cancel(this,AlarmStore.TEST);status.setText("테스트 알람을 취소했습니다.");});
   button(box,"울리는 알람 끄기",()->stopService(new Intent(this,RingService.class)));
@@ -24,6 +26,28 @@ public class MainActivity extends Activity {
  private void permissionSettings(){if(Build.VERSION.SDK_INT>=31&&!AlarmStore.exact(this)){startActivity(new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,Uri.parse("package:"+getPackageName())));return;}if(Build.VERSION.SDK_INT>=24&&!getSystemService(NotificationManager.class).areNotificationsEnabled()){startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName())));return;}if(Build.VERSION.SDK_INT>=34&&!getSystemService(NotificationManager.class).canUseFullScreenIntent()){startActivity(new Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,Uri.parse("package:"+getPackageName())));return;}status.setText("알람 권한이 허용되어 있습니다. 휴대폰 설정에서 알람 음량도 확인해 주세요.");}
  private void refresh(){if(status==null)return;refreshing=true;boolean on=AlarmStore.prefs(this).getBoolean("enabled",false);enabled.setChecked(on);refreshing=false;long synced=AlarmStore.prefs(this).getLong("synced",0);String last=synced==0?"아직 없음":new SimpleDateFormat("MM/dd HH:mm",Locale.KOREA).format(new Date(synced));status.setText("기상 알람: "+(on?(AlarmStore.exact(this)?"켜짐":"권한 필요 · 예약 불가"):"꺼짐")+"\n향후 알람 일정: "+AlarmStore.countFuture(this)+"개 (기기에 다음 1개 예약)\n연결 계정: "+AlarmStore.prefs(this).getString("name","미연결")+"\n다음 알람: "+AlarmStore.prefs(this).getString("next","없음")+"\n최근 동기화: "+last+"\n"+AlarmStore.prefs(this).getString("error","")+(permissions()?"":"\n알림·정확한 알람 권한을 확인해 주세요."));}
  private void showSchedule(){try{org.json.JSONArray a=new org.json.JSONArray(AlarmStore.prefs(this).getString("alarms","[]"));StringBuilder b=new StringBuilder();int n=0;for(int i=0;i<a.length();i++){org.json.JSONObject x=a.getJSONObject(i);if(x.getLong("at")<=System.currentTimeMillis())continue;b.append(x.getString("date")).append("  ").append(x.getString("time")).append("  ").append(x.getString("shift")).append("  ").append(x.getString("source")).append("\n");n++;}if(n==0)b.append("예정된 알람이 없습니다.\n휴무일이거나 아직 동기화되지 않았습니다.");new AlertDialog.Builder(this).setTitle("예약 일정·알람 상태").setMessage(b.toString()).setPositiveButton("확인",null).show();}catch(Exception e){new AlertDialog.Builder(this).setTitle("예약 일정").setMessage("일정 정보를 읽을 수 없습니다. 먼저 동기화해 주세요.").setPositiveButton("확인",null).show();}}
+
+ private void diagnostics(){
+ NotificationManager nm=getSystemService(NotificationManager.class);
+ android.media.AudioManager audio=(android.media.AudioManager)getSystemService(AUDIO_SERVICE);
+ PowerManager power=(PowerManager)getSystemService(POWER_SERVICE);
+ StringBuilder b=new StringBuilder();
+ b.append("계정 연결: ").append(AlarmStore.prefs(this).getString("token","").isEmpty()?"필요":"유지 중");
+ b.append("\n근무 알람: ").append(AlarmStore.prefs(this).getBoolean("enabled",false)?"켜짐":"꺼짐");
+ b.append("\n정확한 알람 권한: ").append(AlarmStore.exact(this)?"허용":"필요");
+ b.append("\n앱 알림: ").append(permissions()?"허용":"권한 확인 필요");
+ if(Build.VERSION.SDK_INT>=26){NotificationChannel ch=nm.getNotificationChannel("wake_alarm_v3");b.append("\n알람 알림 채널: ").append(ch==null?"첫 테스트 시 생성":ch.getImportance()==NotificationManager.IMPORTANCE_NONE?"차단됨":ch.getImportance()<NotificationManager.IMPORTANCE_HIGH?"중요도 낮음 · 화면 표시 제한":"높음");}
+ if(Build.VERSION.SDK_INT>=34)b.append("\n전체 화면: ").append(nm.canUseFullScreenIntent()?"허용":"필요 · 소리와 별개");
+ b.append("\n알람 음량: ").append(audio.getStreamVolume(android.media.AudioManager.STREAM_ALARM)).append("/").append(audio.getStreamMaxVolume(android.media.AudioManager.STREAM_ALARM));
+ b.append("\n배터리 최적화: ").append(power.isIgnoringBatteryOptimizations(getPackageName())?"제외됨":"적용 중 · 일정 갱신 지연 가능");
+ if(Build.VERSION.SDK_INT>=28)b.append("\n백그라운드 제한: ").append(getSystemService(ActivityManager.class).isBackgroundRestricted()?"제한됨":"제한 없음");
+ long last=AlarmStore.prefs(this).getLong("synced",0);
+ b.append("\n일정 동기화: ").append(last==0?"아직 없음":(System.currentTimeMillis()-last)/3600000+"시간 전");
+ b.append("\n다음 알람: ").append(AlarmStore.prefs(this).getString("next","없음"));
+ b.append("\n최근 소리 오류: ").append(AlarmStore.prefs(this).getString("sound_error","없음"));
+ b.append("\n\n전원 꺼짐·강제 종료 상태에서는 앱이 복구할 수 없습니다. 설정 변경 후 앱을 열고 잠금 상태에서 테스트하세요.");
+ new AlertDialog.Builder(this).setTitle("알람 작동 점검").setMessage(b.toString()).setPositiveButton("확인",null).setNeutralButton("알림 설정",(d,w)->startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName())))).show();
+ }
  interface Task{String run()throws Exception;}
  private void background(Task task){status.setText("일정을 확인하는 중입니다…");new Thread(()->{String message;try{message=task.run();}catch(Exception e){message=e.getMessage();}final String result=message;runOnUiThread(()->{if(isFinishing()||isDestroyed())return;refresh();status.append("\n"+result);});}).start();}
  private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
