@@ -7,7 +7,7 @@ final class AlarmStore {
  static PendingIntent pi(Context c,int id,String label){Intent i=new Intent(c,AlarmReceiver.class).setAction("FIRE").putExtra("label",label).putExtra("id",id);return PendingIntent.getBroadcast(c,id,i,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);}
  static void set(Context c,int id,long at,String label){if(!exact(c))return;PendingIntent show=PendingIntent.getActivity(c,0,new Intent(c,MainActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);((AlarmManager)c.getSystemService(Context.ALARM_SERVICE)).setAlarmClock(new AlarmManager.AlarmClockInfo(at,show),pi(c,id,label));}
  static void cancel(Context c,int id){PendingIntent p=pi(c,id,"");((AlarmManager)c.getSystemService(Context.ALARM_SERVICE)).cancel(p);p.cancel();}
- static synchronized void restore(Context c){
+ static int countFuture(Context c){int n=0;try{JSONArray a=new JSONArray(prefs(c).getString("alarms","[]"));for(int i=0;i<a.length();i++)if(a.getJSONObject(i).getLong("at")>System.currentTimeMillis())n++;}catch(Exception ignored){}return n;}\n static synchronized void restore(Context c){
   cancel(c,NEXT);prefs(c).edit().remove("next").apply();
   if(!prefs(c).getBoolean("enabled",false))return;
   try{JSONArray list=new JSONArray(prefs(c).getString("alarms","[]"));for(int n=0;n<list.length();n++){JSONObject a=list.getJSONObject(n);if(a.getLong("at")<=System.currentTimeMillis())continue;String label=a.getString("date")+" "+a.getString("time")+" "+a.getString("shift")+" · "+a.getString("source");set(c,NEXT,a.getLong("at"),label);prefs(c).edit().putString("next",label).apply();break;}}catch(Exception ignored){}
