@@ -11,7 +11,7 @@ final class AlarmStore {
  static synchronized void restore(Context c){
   cancel(c,NEXT);prefs(c).edit().remove("next").apply();
   if(!prefs(c).getBoolean("enabled",false)||!exact(c))return;
-  try{JSONArray list=new JSONArray(prefs(c).getString("alarms","[]"));for(int n=0;n<list.length();n++){JSONObject a=list.getJSONObject(n);if(a.getLong("at")<=System.currentTimeMillis())continue;String label=a.getString("date")+" "+a.getString("time")+" "+a.getString("shift")+" · "+a.getString("source");set(c,NEXT,a.getLong("at"),label);prefs(c).edit().putString("next",label).apply();break;}}catch(Exception ignored){}
+  try{JSONArray list=new JSONArray(prefs(c).getString("alarms","[]"));for(int n=0;n<list.length();n++){JSONObject a=list.getJSONObject(n);if(a.getLong("at")<=System.currentTimeMillis())continue;String label=a.getString("date")+" "+a.getString("time")+" "+a.getString("shift")+" · "+a.getString("source");set(c,NEXT,a.getLong("at"),label);prefs(c).edit().putString("next",label).apply();break;}}catch(Exception e){prefs(c).edit().putString("error","알람 예약 실패: "+e.getClass().getSimpleName()).apply();}
  }
  static JSONObject api(String action,String secret)throws Exception{
   HttpURLConnection cn=(HttpURLConnection)new URL("https://lqqjyedfwlqinppcrvjf.supabase.co/functions/v1/app-alarm").openConnection();
@@ -24,7 +24,9 @@ final class AlarmStore {
   }finally{cn.disconnect();}
  }
  static class Revoked extends IOException {Revoked(){super("연결이 만료되었거나 해제되었습니다. 다시 연결해 주세요.");}}
- static synchronized String sync(Context c)throws Exception {
+ private static final Object SYNC_LOCK=new Object();
+ static String sync(Context c)throws Exception {synchronized(SYNC_LOCK){return syncInternal(c);}}
+ private static String syncInternal(Context c)throws Exception {
   String token=prefs(c).getString("token","");if(token.isEmpty())return "먼저 교대근무 앱에서 연결 코드를 발급해 주세요.";
   try{JSONObject d=api("sync",token);JSONArray a=d.getJSONArray("alarms");for(int i=0;i<a.length();i++){JSONObject row=a.getJSONObject(i);row.getLong("at");row.getString("date");row.getString("time");row.getString("shift");row.getString("source");}
    prefs(c).edit().putString("alarms",a.toString()).putString("name",d.getString("name")).putLong("synced",System.currentTimeMillis()).putString("error","").commit();restore(c);return "일정을 동기화했습니다.";
