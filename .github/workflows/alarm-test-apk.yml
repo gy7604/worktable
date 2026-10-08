@@ -23,6 +23,13 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
+      - name: Check schedule rules and reject anonymous API requests
+        run: |
+          node android-alarm-test/backend/schedule.test.mjs
+          status=$(curl --silent --show-error --max-time 30 --output /tmp/alarm-api.json --write-out '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"action":"sync"}' https://lqqjyedfwlqinppcrvjf.supabase.co/functions/v1/app-alarm)
+          test "$status" = "401"
+          status=$(curl --silent --show-error --max-time 30 --output /tmp/alarm-api.json --write-out '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"action":"exchange","code":"invalid"}' https://lqqjyedfwlqinppcrvjf.supabase.co/functions/v1/app-alarm)
+          test "$status" = "400"
       - name: Build and lint
         working-directory: android-alarm-test
         run: gradle assembleDebug lintDebug --no-daemon
