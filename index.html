@@ -120,6 +120,10 @@ body {
 }
 .cal-nav-btn:hover { background: var(--steel-lt); color: var(--steel); }
 
+.cal-viewport { position: relative; overflow: hidden; touch-action: pan-y pinch-zoom; }
+.cal-grid.is-leaving { position: absolute; inset: 0 0 auto; pointer-events: none; }
+.cal-viewport.is-sliding { pointer-events: none; }
+
 /* ── 요일 헤더 ── */
 .cal-dow {
   display: grid; grid-template-columns: repeat(7, 1fr);
@@ -338,7 +342,7 @@ body {
     <div class="cal-dow">
       <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
     </div>
-    <div class="cal-grid" id="cal-grid"></div>
+    <div class="cal-viewport" id="cal-viewport"><div class="cal-grid" id="cal-grid"></div></div>
   </div>
 
   <!-- 범례 -->
@@ -628,7 +632,10 @@ function renderCalendar(){
     }
 
     cell.appendChild(body);
-    cell.addEventListener('click',()=>openDetail(date,asgn));
+    cell.addEventListener('click',()=>{
+      if(Date.now()<suppressCalendarClickUntil || calendarSliding)return;
+      openDetail(date,asgn);
+    });
     grid.appendChild(cell);
   }
 }
@@ -707,12 +714,93 @@ document.getElementById('detail-modal').addEventListener('click',e=>{
 document.getElementById('btn-detail-close').addEventListener('click',()=>{
   document.getElementById('detail-modal').classList.remove('open');
 });
-document.getElementById('btn-prev').addEventListener('click',()=>{
-  viewMonth--; if(viewMonth<1){viewMonth=12;viewYear--;} renderCalendar();
-});
-document.getElementById('btn-next').addEventListener('click',()=>{
-  viewMonth++; if(viewMonth>12){viewMonth=1;viewYear++;} renderCalendar();
-});
+let calendarSliding=false;
+let suppressCalendarClickUntil=0;
+const calendarViewport=document.getElementById('cal-viewport');
+
+async function changeMonth(direction){
+  if(calendarSliding)return;
+  const grid=document.getElementById('cal-grid');
+  const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const animate=!reduceMotion && typeof grid.animate==='function';
+  const outgoing=animate?grid.cloneNode(true):null;
+  if(outgoing){
+    outgoing.removeAttribute('id');
+    outgoing.classList.add('is-leaving');
+    outgoing.setAttribute('aria-hidden','true');
+    calendarViewport.style.minHeight=grid.offsetHeight+'px';
+  }
+  const next=new Date(viewYear,viewMonth-1+direction,1);
+  viewYear=next.getFullYear();
+  viewMonth=next.getMonth()+1;
+  renderCalendar();
+  if(!outgoing)return;
+  calendarSliding=true;
+  calendarViewport.classList.add('is-sliding');
+  calendarViewport.appendChild(outgoing);
+  calendarViewport.style.minHeight=Math.max(outgoing.offsetHeight,grid.offsetHeight)+'px';
+  const options={duration:280,easing:'cubic-bezier(.22,.61,.36,1)'};
+  const animations=[
+    outgoing.animate([{transform:'translateX(0)'},{transform:'translateX('+(-direction*100)+'%)'}],options),
+    grid.animate([{transform:'translateX('+(direction*100)+'%)'},{transform:'translateX(0)'}],options)
+  ];
+  try{
+    await Promise.all(animations.map(animation=>animation.finished));
+  }catch(error){
+    // A canceled animation still needs to release the calendar.
+  }finally{
+    outgoing.remove();
+    calendarViewport.style.minHeight='';
+    calendarViewport.classList.remove('is-sliding');
+    calendarSliding=false;
+  }
+}
+
+document.getElementById('btn-prev').addEventListener('click',()=>changeMonth(-1));
+document.getElementById('btn-next').addEventListener('click',()=>changeMonth(1));
+document.getElementById('btn-prev').setAttribute('aria-label','이전 달');
+document.getElementById('btn-next').setAttribute('aria-label','다음 달');
+document.getElementById('cal-title').setAttribute('aria-live','polite');
+
+let calendarTouch=null;
+calendarViewport.addEventListener('touchstart',event=>{
+  calendarTouch=null;
+  if(calendarSliding || event.touches.length!==1)return;
+  const touch=event.touches[0];
+  calendarTouch={x:touch.clientX,y:touch.clientY,id:touch.identifier,horizontal:false};
+},{passive:true});
+calendarViewport.addEventListener('touchmove',event=>{
+  if(!calendarTouch)return;
+  if(event.touches.length!==1){calendarTouch=null;return;}
+  const touch=event.touches[0];
+  const dx=touch.clientX-calendarTouch.x;
+  const dy=touch.clientY-calendarTouch.y;
+  if(!calendarTouch.horizontal){
+    if(Math.abs(dy)>12 && Math.abs(dy)>=Math.abs(dx)){calendarTouch=null;return;}
+    if(Math.abs(dx)>12 && Math.abs(dx)>Math.abs(dy)*1.3)calendarTouch.horizontal=true;
+  }
+  if(calendarTouch.horizontal){
+    if(event.cancelable)event.preventDefault();
+    suppressCalendarClickUntil=Date.now()+500;
+  }
+},{passive:false});
+calendarViewport.addEventListener('touchend',event=>{
+  const start=calendarTouch;
+  calendarTouch=null;
+  if(!start || event.touches.length)return;
+  const touch=Array.from(event.changedTouches).find(t=>t.identifier===start.id);
+  if(!touch)return;
+  const dx=touch.clientX-start.x;
+  const dy=touch.clientY-start.y;
+  if(start.horizontal || (Math.abs(dx)>12 && Math.abs(dx)>Math.abs(dy)*1.3)){
+    suppressCalendarClickUntil=Date.now()+500;
+    if(Math.abs(dx)>=50 && Math.abs(dx)>Math.abs(dy)*1.3)changeMonth(dx<0?1:-1);
+  }
+},{passive:true});
+calendarViewport.addEventListener('touchcancel',()=>{
+  if(calendarTouch && calendarTouch.horizontal)suppressCalendarClickUntil=Date.now()+500;
+  calendarTouch=null;
+},{passive:true});
 
 // =============================================
 // 초기화
