@@ -1,4 +1,5 @@
-plugins { id 'com.android.application' }android {
+plugins { id 'com.android.application' }
+android {
  namespace 'io.github.gy7604.alarmtest'
  compileSdk 35
  defaultConfig { applicationId 'io.github.gy7604.alarmtest'; minSdk 23; targetSdk 35; versionCode 2; versionName '0.2-own-alarm' }
