@@ -1,7 +1,6 @@
 package io.github.gy7604.alarmtest;
 import android.app.*;
 import android.content.*;
-import android.content.pm.ResolveInfo;
 import android.os.Bundle;
 import android.provider.AlarmClock;
 import android.graphics.Color;
@@ -60,9 +59,9 @@ public class MainActivity extends Activity {
   // 삼성 시계가 이 동작을 지원하면 우선 사용합니다. 지원하지 않으면 시스템 선택 화면을 사용합니다.
   Intent samsung=new Intent(intent).setPackage("com.sec.android.app.clockpackage");
   Intent target=samsung.resolveActivity(getPackageManager())!=null?samsung:intent;
-  ResolveInfo handler=target.resolveActivity(getPackageManager());
+  ComponentName handler=target.resolveActivity(getPackageManager());
   if(handler==null){record(action+": 이 기기의 시계가 해당 기능을 지원하지 않습니다. 시계에서 수동 확인해 주세요.");return;}
-  try{record(action+" 전송 → "+handler.activityInfo.packageName+"\n실제 성공 여부는 시계에서 확인하세요.");startActivity(target);}
+  try{record(action+" 전송 → "+handler.getPackageName()+"\n실제 성공 여부는 시계에서 확인하세요.");startActivity(target);}
   catch(ActivityNotFoundException|SecurityException e){record(action+" 실패: "+e.getClass().getSimpleName());}
  }
  private void record(String value){status.setText(value);prefs.edit().putString("status",value).apply();}
