@@ -2,6 +2,6 @@ plugins { id 'com.android.application' }
 android {
  namespace 'io.github.gy7604.alarmtest'
  compileSdk 35
- defaultConfig { applicationId 'io.github.gy7604.alarmtest'; minSdk 23; targetSdk 35; versionCode 6; versionName '0.6-custom-time' }
+ defaultConfig { applicationId 'io.github.gy7604.alarmtest'; minSdk 23; targetSdk 35; versionCode 7; versionName '0.7-clock-icon' }
  compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
