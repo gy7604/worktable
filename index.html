@@ -115,9 +115,15 @@ body {
 .my-no-name   { text-align: center; width: 100%; padding: 14px 0; color: var(--ink-sub); font-size: 12px; font-weight: 600; }
 
 /* 조 선택 및 업데이트 */
-.team-picker { display:flex; align-items:center; gap:12px; margin:14px 14px 0; }
-.team-picker label { font-weight:700; color:var(--steel); }
-.team-picker select { flex:1; min-height:44px; padding:8px 12px; border:1px solid var(--border); border-radius:9px; background:var(--surface); color:var(--ink); font:inherit; font-size:14px; }
+.app-bar { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); gap:6px; padding-left:12px; padding-right:12px; }
+.app-bar-left { min-width:0; }
+.app-bar-left p { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.app-bar-actions { justify-self:end; gap:6px; }
+.team-picker { justify-self:center; }
+.team-picker select { width:92px; height:34px; padding:4px 5px; border:1px solid rgba(255,255,255,.45); border-radius:7px; background:var(--steel); color:#fff; font:inherit; font-size:12px; font-weight:700; cursor:pointer; }
+.team-picker select:focus-visible { outline:2px solid #fff; outline-offset:2px; }
+.team-picker option { background:var(--surface); color:var(--ink); }
+@media(max-width:350px) { .app-bar-left h1 { font-size:14px; } .app-bar-left p { font-size:9px; } .team-picker select { width:84px; } }
 .update-panel { margin:12px 14px 0; padding:12px; border-radius:10px; background:var(--steel-lt); }
 .update-panel[hidden] { display:none; }
 .update-panel button { margin-top:8px; padding:10px 16px; border:0; border-radius:8px; background:var(--steel); color:white; font:inherit; font-weight:700; cursor:pointer; }
@@ -334,6 +340,9 @@ body {
       <h1>근무배치표</h1>
       <p id="today-label"></p>
     </div>
+    <div class="team-picker">
+      <select id="team-select" aria-label="근무조 선택"><option value="B">환원B조</option><option value="D">환원D조</option></select>
+    </div>
     <div class="app-bar-actions">
       <a class="shift-app-link" href="https://gy7604.github.io/" aria-label="교대근무 앱으로 이동" title="교대근무로 이동">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -359,10 +368,7 @@ body {
     <div>새 버전이 준비되었습니다.</div>
     <button type="button" id="btn-update">업데이트 적용</button>
   </div>
-  <div class="team-picker">
-    <label for="team-select">근무조</label>
-    <select id="team-select"><option value="B">환원B조</option><option value="D">환원D조</option></select>
-  </div>
+
   <!-- 내 근무 카드 -->
   <div class="my-card" id="my-card"></div>
 
