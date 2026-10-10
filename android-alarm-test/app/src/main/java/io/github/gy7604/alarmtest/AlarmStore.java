@@ -7,6 +7,16 @@ final class AlarmStore {
  static PendingIntent pi(Context c,int id,String label){Intent i=new Intent(c,AlarmReceiver.class).setAction("FIRE").putExtra("label",label).putExtra("id",id);return PendingIntent.getBroadcast(c,id,i,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);}
  static void set(Context c,int id,long at,String label){if(!exact(c))return;PendingIntent show=PendingIntent.getActivity(c,0,new Intent(c,MainActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);((AlarmManager)c.getSystemService(Context.ALARM_SERVICE)).setAlarmClock(new AlarmManager.AlarmClockInfo(at,show),pi(c,id,label));}
  static void cancel(Context c,int id){PendingIntent p=pi(c,id,"");((AlarmManager)c.getSystemService(Context.ALARM_SERVICE)).cancel(p);p.cancel();}
+
+ static String wakeTime(Context c,boolean night){return prefs(c).getString(night?"night_time":"day_time",night?"17:10":"05:00");}
+ static JSONArray plan(Context c)throws Exception{
+ JSONArray raw=new JSONArray(prefs(c).getString("alarms","[]"));java.util.List<JSONObject> rows=new java.util.ArrayList<>();
+ for(int i=0;i<raw.length();i++){JSONObject a=new JSONObject(raw.getJSONObject(i).toString());String shift=a.getString("shift");boolean night=shift.contains("야간");if(!night&&!shift.contains("주간"))continue;
+ String time=wakeTime(c,night);String[] date=a.getString("date").split("-");String[] hm=time.split(":");
+ java.util.Calendar cal=java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("Asia/Seoul"));cal.clear();cal.setLenient(false);cal.set(Integer.parseInt(date[0]),Integer.parseInt(date[1])-1,Integer.parseInt(date[2]),Integer.parseInt(hm[0]),Integer.parseInt(hm[1]),0);
+ a.put("time",time);a.put("at",cal.getTimeInMillis());rows.add(a);}
+ java.util.Collections.sort(rows,(a,b)->Long.compare(a.optLong("at"),b.optLong("at")));JSONArray out=new JSONArray();for(JSONObject a:rows)out.put(a);return out;
+ }
  static int countFuture(Context c){int n=0;try{JSONArray a=new JSONArray(prefs(c).getString("alarms","[]"));for(int i=0;i<a.length();i++)if(a.getJSONObject(i).getLong("at")>System.currentTimeMillis())n++;}catch(Exception ignored){}return n;}
  static synchronized void restore(Context c){
   cancel(c,NEXT);prefs(c).edit().remove("next").apply();
