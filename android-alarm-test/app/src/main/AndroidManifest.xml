@@ -9,7 +9,7 @@
  <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
  <uses-permission android:name="android.permission.WAKE_LOCK"/>
  <uses-permission android:name="android.permission.VIBRATE"/>
- <application android:label="교대 기상 알람" android:allowBackup="false" android:usesCleartextTraffic="false" android:theme="@android:style/Theme.Material.Light.NoActionBar">
+ <application android:icon="@drawable/ic_shift_alarm" android:roundIcon="@drawable/ic_shift_alarm" android:label="교대 기상 알람" android:allowBackup="false" android:usesCleartextTraffic="false" android:theme="@android:style/Theme.Material.Light.NoActionBar">
   <activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
   <activity android:name=".AlarmActivity" android:exported="false" android:excludeFromRecents="true"/>
   <receiver android:name=".AlarmReceiver" android:exported="false"/>
