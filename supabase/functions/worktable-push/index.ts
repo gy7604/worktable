@@ -22,9 +22,10 @@ function findWork(name:string,date:Date,records:any[],shift:string){
    const uncertain=/규칙 확인 필요|관리자 확인/.test(a.note||'');
    return {team,role:label,note:uncertain?'휴무 변동이 있어 담당 포지션을 확인해 주세요.':a.note};
   }
+  if(a.changed&&TEAMS[team].members.includes(name)&&!a.off?.includes(name)&&['kiln','pellet','clean'].some(role=>a[role]==='당일 확인'))return {team,role:'현장 · 당일 확인',note:'현장 배치를 당일 확인해 주세요.'};
   // Unspecified multi-helper allocation must not silently suppress a known substitution shift.
   const helper=records.some(r=>r.team===team&&r.shift_date===date.toISOString().slice(0,10)&&r.shift_type===(shift==='D'?'주간':'야간')&&r.status==='FILLED'&&r.filled_by===name&&TEAMS[team].members.includes(r.requested_by)&&r.request_kind!=='support'&&!/정수|지원/.test(r.reason||''));
-  if(helper)return {team,role:'대근 · 포지션 확인 필요',note:'현장 배치를 확인해 주세요.'};
+  if(helper)return {team,role:'현장 대근 · 당일 확인',note:'현장 배치를 확인해 주세요.'};
  }
  return null;
 }
