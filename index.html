@@ -600,9 +600,10 @@ const LINK_SESSION_KEY='worktable-shift-session';
 let linkedToken=readSetting(LINK_SESSION_KEY)||'';
 let linkedRecords=[];
 let linkedMonths=new Set();
+let linkedIdentityApplied=false;
 let syncVersion=0;
 function removeLinkSession(){
-  linkedToken='';linkedRecords=[];linkedMonths.clear();syncVersion++;
+  linkedToken='';linkedRecords=[];linkedMonths.clear();linkedIdentityApplied=false;syncVersion++;
   try{localStorage.removeItem(LINK_SESSION_KEY);}catch{}
 }
 function applyDailyChanges(base,date,records,team=selectedTeam){
@@ -1083,6 +1084,16 @@ async function callShift(body,token=linkedToken){
  }
  return data;
 }
+function applyLinkedIdentity(identity){
+ if(!TEAMS[identity.team]?.members.includes(identity.name))return false;
+ selectedTeam=identity.team;myName=identity.name;
+ teamSelect.value=selectedTeam;
+ saveSetting('worktable-team',selectedTeam);
+ saveSetting('worktable-name-'+selectedTeam,myName);
+ document.getElementById('name-modal').classList.remove('open');
+ renderMyCard();renderCalendar();
+ return true;
+}
 async function syncShift(force=false){
  if(!linkedToken){linkStatus.textContent='미연결 · 기본 배치표';return;}
  if(loadingLink){resyncLink=true;return;}
@@ -1092,6 +1103,16 @@ async function syncShift(force=false){
  const unique=[...new Map(months.map(d=>[dateKey(d).slice(0,7),d])).values()];
  linkStatus.textContent='휴무·대근 확인 중…';
  try{
+  if(!linkedIdentityApplied){
+   try{
+    const identity=await callWorkPush({action:'status',endpoint:''});
+    if(version!==syncVersion||token!==linkedToken)return;
+    linkedIdentityApplied=applyLinkedIdentity(identity);
+   }catch(error){
+    if(version!==syncVersion||token!==linkedToken)return;
+    if(error.status===401||error.status===403)throw error;
+   }
+  }
   for(const month of unique){
    const key=dateKey(month).slice(0,7);
    if(!force&&linkedMonths.has(key))continue;
@@ -1144,7 +1165,6 @@ document.getElementById('btn-link-disconnect').addEventListener('click',async()=
 teamSelect.addEventListener('change',()=>syncShift(false));
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')syncShift(true);});
 window.addEventListener('online',()=>syncShift(true));
-syncShift(true);
 
 const WORK_VAPID_KEY="BMOwpjlyVl1JdfrCuFQW8bYnlmzCgVCpMSSxtJ7uxl7qHVYBbF-6SossGQAnVeG34ULs5Yv2jPXd6Fob2aJL5vc";
 const PUSH_API=SHIFT_API.replace('/app-session','/worktable-push');
@@ -1155,7 +1175,7 @@ async function callWorkPush(body){
  if(!linkedToken)throw new Error('먼저 교대근무 계정을 연결해 주세요.');
  const response=await fetch(PUSH_API,{method:'POST',headers:{'Content-Type':'application/json','apikey':SHIFT_PUBLIC_KEY,'x-app-session':linkedToken},body:JSON.stringify(body),cache:'no-store',signal:AbortSignal.timeout(15000)});
  const result=await response.json();
- if(!response.ok||!result.success)throw new Error(result.message||'알림 설정을 확인하지 못했습니다.');
+ if(!response.ok||!result.success){const error=new Error(result.message||'알림 설정을 확인하지 못했습니다.');error.status=response.status;throw error;}
  return result;
 }
 function pushSupported(){return 'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;}
@@ -1235,6 +1255,7 @@ if('serviceWorker' in navigator){
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkUpdate();});
   window.addEventListener('online',checkUpdate);
 }
+syncShift(true);
 </script>
 </body>
 </html>
