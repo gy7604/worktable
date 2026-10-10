@@ -383,6 +383,10 @@ body {
     <div class="link-tools"><strong>교대근무 연동</strong><button type="button" id="btn-link">계정 연결</button><button type="button" id="btn-link-refresh">새로고침</button><button type="button" id="btn-link-disconnect">연결 해제</button></div>
     <div class="link-status" id="link-status" role="status">미연결 · 기본 배치표</div>
   </div>
+  <div class="link-panel">
+    <div class="link-tools"><strong>당일 근무 알림</strong><button type="button" id="btn-work-push">알림 켜기</button><button type="button" id="btn-work-push-test">테스트</button><button type="button" id="btn-work-push-off">끄기</button></div>
+    <div class="link-status" id="work-push-status" role="status">주간 05:50 / 야간 17:50 · 휴무일 제외</div>
+  </div>
   <!-- 내 근무 카드 -->
   <div class="my-card" id="my-card"></div>
 
@@ -1099,7 +1103,7 @@ document.getElementById('link-form').addEventListener('submit',async event=>{
   if(data.requires_code_upgrade)throw new Error('교대근무 앱에서 접속코드를 변경한 뒤 다시 연결해 주세요.');
   if(!/^[0-9a-f]{64}$/.test(data.token||''))throw new Error('연결 정보를 확인하지 못했습니다.');
   removeLinkSession();linkedToken=data.token;saveSetting(LINK_SESSION_KEY,linkedToken);
-  linkDialog.close();await syncShift(true);
+  linkDialog.close();await syncShift(true);checkWorkPush();
  }catch(error){document.getElementById('link-message').textContent=error.message;}
  finally{linking=false;button.disabled=false;}
 });
@@ -1112,6 +1116,58 @@ teamSelect.addEventListener('change',()=>syncShift(false));
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')syncShift(true);});
 window.addEventListener('online',()=>syncShift(true));
 syncShift(true);
+
+const WORK_VAPID_KEY="BMOwpjlyVl1JdfrCuFQW8bYnlmzCgVCpMSSxtJ7uxl7qHVYBbF-6SossGQAnVeG34ULs5Yv2jPXd6Fob2aJL5vc";
+const PUSH_API=SHIFT_API.replace('/app-session','/worktable-push');
+const pushStatus=document.getElementById('work-push-status');
+const pushButton=document.getElementById('btn-work-push');
+let pushBusy=false;
+async function callWorkPush(body){
+ if(!linkedToken)throw new Error('먼저 교대근무 계정을 연결해 주세요.');
+ const response=await fetch(PUSH_API,{method:'POST',headers:{'Content-Type':'application/json','apikey':SHIFT_PUBLIC_KEY,'x-app-session':linkedToken},body:JSON.stringify(body),cache:'no-store',signal:AbortSignal.timeout(15000)});
+ const result=await response.json();
+ if(!response.ok||!result.success)throw new Error(result.message||'알림 설정을 확인하지 못했습니다.');
+ return result;
+}
+function pushSupported(){return 'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;}
+function pushKeyBytes(key){const padded=key.replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-key.length%4)%4);return Uint8Array.from(atob(padded),c=>c.charCodeAt(0));}
+async function checkWorkPush(){
+ if(!pushSupported()){pushStatus.textContent='이 브라우저에서는 알림을 지원하지 않습니다.';pushButton.disabled=true;return;}
+ if(!linkedToken){pushStatus.textContent='계정 연결 후 알림을 켜 주세요.';return;}
+ try{
+  const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();
+  const result=await callWorkPush({action:'status',endpoint:sub?.endpoint||''});
+  pushStatus.textContent=result.enabled?result.name+'님 · 주간 05:50 / 야간 17:50 알림 켜짐':'주간 05:50 / 야간 17:50 · 알림 꺼짐';
+ }catch(error){pushStatus.textContent=error.message;}
+}
+pushButton.addEventListener('click',async()=>{
+ if(pushBusy)return;
+ if(!linkedToken){pushStatus.textContent='먼저 교대근무 계정을 연결해 주세요.';return;}
+ if(!myName){pushStatus.textContent='먼저 본인 조와 이름을 선택해 주세요.';return;}
+ pushBusy=true;pushButton.disabled=true;
+ try{
+  const permission=await Notification.requestPermission();
+  if(permission!=='granted')throw new Error('휴대폰에서 근무배치표 알림을 허용해 주세요.');
+  const reg=await navigator.serviceWorker.ready;
+  let sub=await reg.pushManager.getSubscription();
+  if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:pushKeyBytes(WORK_VAPID_KEY)});
+  const result=await callWorkPush({action:'register',subscription:sub.toJSON(),name:myName,team:selectedTeam});
+  pushStatus.textContent=result.name+'님 · 주간 05:50 / 야간 17:50 알림 켜짐';
+ }catch(error){pushStatus.textContent=error.message;}
+ finally{pushBusy=false;pushButton.disabled=false;}
+});
+document.getElementById('btn-work-push-off').addEventListener('click',async()=>{
+ if(pushBusy)return;pushBusy=true;
+ try{const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();if(sub)await callWorkPush({action:'disable',endpoint:sub.endpoint});pushStatus.textContent='근무 알림 꺼짐';}
+ catch(error){pushStatus.textContent=error.message;}finally{pushBusy=false;}
+});
+document.getElementById('btn-work-push-test').addEventListener('click',async()=>{
+ if(pushBusy)return;pushBusy=true;
+ try{const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();if(!sub)throw new Error('먼저 근무 알림을 켜 주세요.');const result=await callWorkPush({action:'test',endpoint:sub.endpoint});pushStatus.textContent=result.message;}
+ catch(error){pushStatus.textContent=error.message;}finally{pushBusy=false;}
+});
+window.addEventListener('load',()=>checkWorkPush());
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkWorkPush();});
 
 if('serviceWorker' in navigator){
   let appRegistration=null;
