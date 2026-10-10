@@ -1,4 +1,4 @@
-const CACHE_NAME='worktable-v9';
+const CACHE_NAME='worktable-v10';
 const ASSETS=['./','./index.html','./manifest.json','./icons/icon-192.png','./icons/icon-512.png'];
 self.addEventListener('install',event=>{
   event.waitUntil((async()=>{
@@ -36,4 +36,23 @@ self.addEventListener('fetch',event=>{
     if(response.ok)await cache.put(event.request,response.clone());
     return response;
   })());
+});
+self.addEventListener('push',event=>{
+ let data={};try{data=event.data?.json()||{};}catch{}
+ event.waitUntil(self.registration.showNotification(data.title||'근무배치표',{
+  body:typeof data.body==='string'?data.body:'당일 근무배치를 확인해 주세요.',
+  icon:'./icons/icon-192.png',badge:'./icons/icon-192.png',
+  tag:typeof data.tag==='string'?data.tag:'worktable-reminder',
+  data:{url:self.location.origin+'/worktable/'},
+ }));
+});
+self.addEventListener('notificationclick',event=>{
+ event.notification.close();
+ event.waitUntil((async()=>{
+  const url=self.location.origin+'/worktable/';
+  const windows=await self.clients.matchAll({type:'window',includeUncontrolled:true});
+  const found=windows.find(client=>client.url.startsWith(url));
+  if(found){await found.focus();return;}
+  await self.clients.openWindow(url);
+ })());
 });
