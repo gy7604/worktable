@@ -1,4 +1,4 @@
-const CACHE_NAME = 'worktable-v5';
+const CACHE_NAME = 'worktable-v6';
 const ASSETS = [
   './',
   './index.html',
