@@ -1,4 +1,4 @@
-const CACHE_NAME='worktable-v7';
+const CACHE_NAME='worktable-v8';
 const ASSETS=['./','./index.html','./manifest.json','./icons/icon-192.png','./icons/icon-512.png'];
 self.addEventListener('install',event=>{
   event.waitUntil((async()=>{
