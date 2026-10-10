@@ -601,13 +601,11 @@ function applyDailyChanges(base,date,records,team=selectedTeam){
   const helpers=[...new Set(rows.filter(r=>r.status==='FILLED'&&r.filled_by&&!members.includes(r.filled_by)).map(r=>String(r.filled_by)))];
   if(!off.size&&!helpers.length)return {...base};
   const result={...base,changed:true,off:[...off]};
-  const roles=['ccr1','ccr2','kiln','pellet','clean'];
-  function unconfirmed(message){
-    for(const key of roles)if(off.has(result[key]))result[key]='공석';
+    function unconfirmed(message){
+    for(const key of ['ccr1','ccr2'])if(off.has(result[key]))result[key]='당일 확인';
+    for(const key of ['kiln','pellet','clean'])result[key]='당일 확인';
     result.note=message;return result;
   }
-  // Multi-helper field allocation has not yet been specified.
-  if(helpers.length>1)return unconfirmed('대근자 2명 이상: 현장 배치 규칙 확인 필요');
   const direction=team==='B'?-1:1;
   function candidates(name,step){const start=members.indexOf(name);return Array.from({length:5},(_,i)=>members[(start+step*i+50)%5]).filter(n=>!off.has(n));}
   const first=off.has(base.ccr1)?candidates(base.ccr1,direction):[base.ccr1];
@@ -617,6 +615,7 @@ function applyDailyChanges(base,date,records,team=selectedTeam){
   for(const a of first){for(const b of second)if(a!==b&&!forbidden(a,b)){pair=[a,b];break;}if(pair)break;}
   if(!pair)return unconfirmed('CCR 배치 가능한 조합 없음 · 관리자 확인 필요');
   result.ccr1=pair[0];result.ccr2=pair[1];
+  if(helpers.length>1)return unconfirmed('운전실 규칙 배치 · 현장 당일 확인');
   const used=new Set(pair);
   if(helpers.length===1){result.pellet=helpers[0];used.add(helpers[0]);}
   else result.pellet='공석';
@@ -629,7 +628,8 @@ function applyDailyChanges(base,date,records,team=selectedTeam){
   for(const role of ['kiln','clean'])if(result[role]==='공석'&&remaining.length){result[role]=remaining.shift();used.add(result[role]);}
   if(!helpers.length&&!off.has(base.pellet)&&!used.has(base.pellet)){result.pellet=base.pellet;used.add(base.pellet);}
   if(remaining.some(n=>!used.has(n)))return unconfirmed('현장 배치 규칙 확인 필요');
-  result.note=helpers.length===1?'휴무 반영 · 대근자 Pellet 배치 · 당일만 변경':'휴무 반영 · 대근 미등록 / 공석 확인 필요';
+  for(const role of ['kiln','pellet','clean'])if(result[role]==='공석')result[role]='당일 확인';
+  result.note=helpers.length===1?'휴무 반영 · 대근자 Pellet 배치 · 당일만 변경':'휴무 반영 · 현장 당일 확인';
   return result;
 }
 function getAsgn(date){return applyDailyChanges(getBaseAsgn(date),date,linkedRecords);}
