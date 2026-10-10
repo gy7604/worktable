@@ -114,6 +114,16 @@ body {
 .my-info-off  { font-size: 17px; font-weight: 700; color: var(--ink-sub); }
 .my-no-name   { text-align: center; width: 100%; padding: 14px 0; color: var(--ink-sub); font-size: 12px; font-weight: 600; }
 
+/* 교대근무 연동 */
+.link-panel { margin:12px 14px 0; padding:10px 12px; border:1px solid var(--border); border-radius:9px; background:var(--bg); }
+.link-tools { display:flex; align-items:center; flex-wrap:wrap; gap:6px; }
+.link-panel button,.link-dialog button { padding:8px 10px; border:1px solid var(--border); border-radius:7px; font:inherit; background:white; color:var(--steel); cursor:pointer; }
+.link-status { margin-top:6px; font-size:11px; color:var(--ink-sub); }
+.link-dialog { margin:auto; width:calc(100% - 32px); max-width:380px; padding:20px; border:0; border-radius:14px; }
+.link-dialog::backdrop { background:rgba(0,0,0,.45); }
+.link-dialog input { width:100%; margin:12px 0; min-height:44px; padding:10px; border:1px solid var(--border); border-radius:7px; font:inherit; }
+.day-cell.is-adjusted { border-color:var(--steel-mid); }
+.adjusted-label { font-size:8px; font-weight:700; padding:2px; text-align:center; background:var(--steel-lt); color:var(--steel); }
 /* 조 선택 및 업데이트 */
 .app-bar { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); gap:6px; padding-left:12px; padding-right:12px; }
 .app-bar-left { min-width:0; }
@@ -369,6 +379,10 @@ body {
     <button type="button" id="btn-update">업데이트 적용</button>
   </div>
 
+  <div class="link-panel">
+    <div class="link-tools"><strong>교대근무 연동</strong><button type="button" id="btn-link">계정 연결</button><button type="button" id="btn-link-refresh">새로고침</button><button type="button" id="btn-link-disconnect">연결 해제</button></div>
+    <div class="link-status" id="link-status" role="status">미연결 · 기본 배치표</div>
+  </div>
   <!-- 내 근무 카드 -->
   <div class="my-card" id="my-card"></div>
 
@@ -418,6 +432,15 @@ body {
   </div>
 </div>
 
+<dialog id="link-dialog" class="link-dialog" aria-labelledby="link-title">
+  <form id="link-form">
+    <h2 id="link-title" style="font-size:16px;">교대근무 계정 연결</h2>
+    <p style="margin-top:10px;line-height:1.6;">교대근무 앱의 본인 접속코드를 입력해 주세요. 휴무·대근 정보를 조회하며 접속코드는 저장하지 않습니다.</p>
+    <label for="link-code">접속코드</label><input id="link-code" type="password" autocomplete="current-password" maxlength="200" required>
+    <p id="link-message" role="alert" style="color:#C81E1E;margin-bottom:10px;"></p>
+    <button type="submit" id="btn-link-submit">연결</button><button type="button" id="btn-link-cancel">닫기</button>
+  </form>
+</dialog>
 <script>
 // =============================================
 // 근무 계산 엔진
@@ -536,7 +559,7 @@ function getDAsgn(date){
   }
   return dCache[target];
 }
-function getAsgn(date){
+function getBaseAsgn(date){
   if(selectedTeam==='D')return getDAsgn(date);
   const key=dateKey(date);
   if(!cache[key]){
@@ -545,6 +568,59 @@ function getAsgn(date){
   }
   return cache[key]||{shift:'O'};
 }
+
+const SHIFT_API="https://lqqjyedfwlqinppcrvjf.supabase.co/functions/v1/app-session";
+const SHIFT_PUBLIC_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxcWp5ZWRmd2xxaW5wcGNydmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA3MzQ3NDgsImV4cCI6MjEwNjMxMDc0OH0.8N5fmaNOdNG1hKDTzAYYX6Pd9bc0AnJvBzGQpfsndFo";
+const LINK_SESSION_KEY='worktable-shift-session';
+let linkedToken=readSetting(LINK_SESSION_KEY)||'';
+let linkedRecords=[];
+let linkedMonths=new Set();
+let syncVersion=0;
+function removeLinkSession(){
+  linkedToken='';linkedRecords=[];linkedMonths.clear();syncVersion++;
+  try{localStorage.removeItem(LINK_SESSION_KEY);}catch{}
+}
+function applyDailyChanges(base,date,records,team=selectedTeam){
+  if(base.shift==='O'||base.shift==='U')return {...base};
+  const shift=base.shift==='D'?'주간':'야간';
+  const members=TEAMS[team].members;
+  const rows=records.filter(r=>members.includes(r.requested_by) && r.team===team && r.shift_date===dateKey(date) && r.shift_type===shift && r.request_kind!=='support' && !/정수|지원/.test(String(r.reason||'')) && !['CANCELLED','CANCELED','DELETED'].includes(r.status));
+  const off=new Set(rows.map(r=>r.requested_by).filter(n=>members.includes(n)));
+  const helpers=[...new Set(rows.filter(r=>r.status==='FILLED'&&r.filled_by&&!members.includes(r.filled_by)).map(r=>String(r.filled_by)))];
+  if(!off.size&&!helpers.length)return {...base};
+  const result={...base,changed:true,off:[...off]};
+  const roles=['ccr1','ccr2','kiln','pellet','clean'];
+  function unconfirmed(message){
+    for(const key of roles)if(off.has(result[key]))result[key]='공석';
+    result.note=message;return result;
+  }
+  // Multi-helper field allocation has not yet been specified.
+  if(helpers.length>1)return unconfirmed('대근자 2명 이상: 현장 배치 규칙 확인 필요');
+  const direction=team==='B'?-1:1;
+  function candidates(name,step){const start=members.indexOf(name);return Array.from({length:5},(_,i)=>members[(start+step*i+50)%5]).filter(n=>!off.has(n));}
+  const first=off.has(base.ccr1)?candidates(base.ccr1,direction):[base.ccr1];
+  const second=off.has(base.ccr2)?candidates(base.ccr2,-direction):[base.ccr2];
+  const forbidden=(a,b)=>team==='B'&&[a,b].includes('강신혁')&&[a,b].includes('장경준');
+  let pair=null;
+  for(const a of first){for(const b of second)if(a!==b&&!forbidden(a,b)){pair=[a,b];break;}if(pair)break;}
+  if(!pair)return unconfirmed('CCR 배치 가능한 조합 없음 · 관리자 확인 필요');
+  result.ccr1=pair[0];result.ccr2=pair[1];
+  const used=new Set(pair);
+  if(helpers.length===1){result.pellet=helpers[0];used.add(helpers[0]);}
+  else result.pellet='공석';
+  // Keep available field staff at their original positions first.
+  for(const role of ['kiln','clean']){
+    const name=base[role];
+    if(!off.has(name)&&!used.has(name)){result[role]=name;used.add(name);}else result[role]='공석';
+  }
+  const remaining=members.filter(n=>!off.has(n)&&!used.has(n));
+  for(const role of ['kiln','clean'])if(result[role]==='공석'&&remaining.length){result[role]=remaining.shift();used.add(result[role]);}
+  if(!helpers.length&&!off.has(base.pellet)&&!used.has(base.pellet)){result.pellet=base.pellet;used.add(base.pellet);}
+  if(remaining.some(n=>!used.has(n)))return unconfirmed('현장 배치 규칙 확인 필요');
+  result.note=helpers.length===1?'휴무 반영 · 대근자 Pellet 배치 · 당일만 변경':'휴무 반영 · 대근 미등록 / 공석 확인 필요';
+  return result;
+}
+function getAsgn(date){return applyDailyChanges(getBaseAsgn(date),date,linkedRecords);}
 
 function getMyPos(asgn,name){
   if(!asgn||asgn.shift==='O'||asgn.shift==='U'||!name)return null;
@@ -645,7 +721,7 @@ function renderCalendar(){
     const myPos=getMyPos(asgn,myName);
 
     const cell=document.createElement('div');
-    cell.className='day-cell'+(isToday?' is-today':'')+(myPos?' is-mine':'');
+    cell.className='day-cell'+(isToday?' is-today':'')+(myPos?' is-mine':'')+(asgn.changed?' is-adjusted':'');
 
     // ── 셀 헤더 (날짜 + 근무유형) ──
     const head=document.createElement('div');
@@ -707,6 +783,7 @@ function renderCalendar(){
     }
 
     cell.appendChild(body);
+    if(asgn.changed){const tag=document.createElement('div');tag.className='adjusted-label';tag.textContent=asgn.note.includes('확인 필요')||asgn.note.includes('관리자')?'배치 확인 필요':'당일 변경';cell.appendChild(tag);}
     cell.addEventListener('click',()=>{
       if(Date.now()<suppressCalendarClickUntil || calendarSliding)return;
       openDetail(date,asgn);
@@ -742,10 +819,11 @@ function openDetail(date,asgn){
       row.className='d-row '+def.drCls;
       row.innerHTML=`
         <span class="d-row-label ${def.dlCls}">${DETAIL_LABELS[def.key]}</span>
-        <span class="d-row-name${isMine?' mine':''}">${mn}${isMine?'<span class="mine-tag">나</span>':''}</span>`;
+        <span class="d-row-name${isMine?' mine':''}">${escapeName(mn)}${isMine?'<span class="mine-tag">나</span>':''}</span>`;
       rowsEl.appendChild(row);
     });
   }
+  if(asgn.note){const note=document.createElement('p');note.textContent=asgn.note+(asgn.off.length?' · 휴무: '+asgn.off.join(', '):'');note.style.cssText='margin-top:12px;color:var(--ink-sub);font-size:12px;';rowsEl.appendChild(note);}
   document.getElementById('detail-modal').classList.add('open');
 }
 
@@ -812,6 +890,7 @@ async function changeMonth(direction){
   viewYear=next.getFullYear();
   viewMonth=next.getMonth()+1;
   renderCalendar();
+  syncShift(false);
   if(!outgoing)return;
   calendarSliding=true;
   calendarViewport.classList.add('is-sliding');
@@ -961,6 +1040,78 @@ installButton.addEventListener('click',async()=>{
     : 'Chrome의 ⋮ 메뉴 → 홈 화면에 추가 → 설치를 선택해 주세요. 앱 안의 브라우저라면 먼저 ⋮ → Chrome에서 열기를 선택하세요. 이미 설치했다면 홈 화면이나 앱 목록에서 근무배치표를 열어 주세요.';
   installHelp.hidden=false;
 });
+
+const linkStatus=document.getElementById('link-status');
+const linkDialog=document.getElementById('link-dialog');
+const linkCode=document.getElementById('link-code');
+let linking=false;
+let loadingLink=false;
+let resyncLink=false;
+function escapeName(value){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+async function callShift(body,token=linkedToken){
+ const headers={'Content-Type':'application/json','apikey':SHIFT_PUBLIC_KEY};
+ if(token)headers['x-app-session']=token;
+ const response=await fetch(SHIFT_API,{method:'POST',headers,body:JSON.stringify(body),cache:'no-store',signal:AbortSignal.timeout(15000)});
+ const data=await response.json();
+ if(!response.ok||!data.success){
+  const error=new Error(data.message||'연동 정보를 불러오지 못했습니다.');error.status=response.status;throw error;
+ }
+ return data;
+}
+async function syncShift(force=false){
+ if(!linkedToken){linkStatus.textContent='미연결 · 기본 배치표';return;}
+ if(loadingLink){resyncLink=true;return;}
+ loadingLink=true;
+ const version=syncVersion,token=linkedToken;
+ const months=[new Date(viewYear,viewMonth-1,1),new Date(today.getFullYear(),today.getMonth(),1)];
+ const unique=[...new Map(months.map(d=>[dateKey(d).slice(0,7),d])).values()];
+ linkStatus.textContent='휴무·대근 확인 중…';
+ try{
+  for(const month of unique){
+   const key=dateKey(month).slice(0,7);
+   if(!force&&linkedMonths.has(key))continue;
+   const data=await callShift({action:'calendar_read',start_date:dateKey(month),end_date:dateKey(new Date(month.getFullYear(),month.getMonth()+1,1))},token);
+   if(version!==syncVersion||token!==linkedToken)return;
+   linkedRecords=linkedRecords.filter(r=>!String(r.shift_date).startsWith(key)).concat(data.requests||[]);
+   linkedMonths.add(key);
+  }
+  linkStatus.textContent='연동 완료 · '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})+' 확인';
+  renderMyCard();renderCalendar();
+ }catch(error){
+  if(version!==syncVersion||token!==linkedToken)return;
+  if(error.status===401||error.status===403){removeLinkSession();linkStatus.textContent='연결 만료 · 접속코드로 다시 연결';renderMyCard();renderCalendar();}
+  else linkStatus.textContent=linkedRecords.length?'갱신 실패 · 마지막 확인 정보 표시':'조회 실패 · 기본 배치 표시';
+ }finally{loadingLink=false;if(resyncLink){resyncLink=false;syncShift(true);}}
+}
+document.getElementById('btn-link').addEventListener('click',()=>{
+ document.getElementById('link-message').textContent='';
+ linkDialog.showModal();linkCode.focus();
+});
+document.getElementById('btn-link-cancel').addEventListener('click',()=>linkDialog.close());
+linkDialog.addEventListener('close',()=>{linkCode.value='';});
+document.getElementById('link-form').addEventListener('submit',async event=>{
+ event.preventDefault();if(linking)return;linking=true;
+ const button=document.getElementById('btn-link-submit');button.disabled=true;
+ try{
+  const code=linkCode.value.trim();linkCode.value='';
+  if(!code)throw new Error('교대근무 접속코드를 입력해 주세요.');
+  const data=await callShift({action:'login',code},'');
+  if(data.requires_code_upgrade)throw new Error('교대근무 앱에서 접속코드를 변경한 뒤 다시 연결해 주세요.');
+  if(!/^[0-9a-f]{64}$/.test(data.token||''))throw new Error('연결 정보를 확인하지 못했습니다.');
+  removeLinkSession();linkedToken=data.token;saveSetting(LINK_SESSION_KEY,linkedToken);
+  linkDialog.close();await syncShift(true);
+ }catch(error){document.getElementById('link-message').textContent=error.message;}
+ finally{linking=false;button.disabled=false;}
+});
+document.getElementById('btn-link-refresh').addEventListener('click',()=>syncShift(true));
+document.getElementById('btn-link-disconnect').addEventListener('click',async()=>{
+ const token=linkedToken;removeLinkSession();linkStatus.textContent='미연결 · 기본 배치표';renderMyCard();renderCalendar();
+ if(token)try{await callShift({action:'logout'},token);}catch{}
+});
+teamSelect.addEventListener('change',()=>syncShift(false));
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')syncShift(true);});
+window.addEventListener('online',()=>syncShift(true));
+syncShift(true);
 
 if('serviceWorker' in navigator){
   let appRegistration=null;
