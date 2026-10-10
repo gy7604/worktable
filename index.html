@@ -375,11 +375,6 @@ body {
         </svg>
         <span>교대근무</span>
       </a>
-    <button class="btn-icon" id="btn-select-name" title="내 이름 선택">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
-      </svg>
-    </button>
     </div>
   </div>
 
@@ -420,15 +415,6 @@ body {
     <div class="leg"><span style="display:inline-block;width:12px;height:7px;border-radius:2px;background:var(--night-hd)"></span>야간</div>
   </div>
 
-</div>
-
-<!-- 이름 선택 모달 -->
-<div class="modal-overlay" id="name-modal">
-  <div class="modal-sheet">
-    <div class="modal-handle"></div>
-    <div class="modal-title">내 이름을 선택하세요</div>
-    <div class="name-grid" id="name-grid"></div>
-  </div>
 </div>
 
 <!-- 상세 바텀시트 -->
@@ -690,7 +676,7 @@ function renderMyCard(){
 
   let bodyHtml='';
   if(!myName){
-    bodyHtml=`<div class="my-card-body"><div class="my-no-name">우측 상단 버튼을 눌러 내 이름을 선택하세요</div></div>`;
+    bodyHtml=`<div class="my-card-body"><div class="my-no-name">상단 연동에서 교대근무 계정을 연결하면 내 근무가 표시됩니다</div></div>`;
   } else if(!pos){
     bodyHtml=`<div class="my-card-body">
       <div class="my-badge" style="background:var(--off-bg);color:var(--ink-sub);font-size:20px;">😴</div>
@@ -856,39 +842,6 @@ function openDetail(date,asgn){
 // =============================================
 // 이름 선택
 // =============================================
-function renderNameGrid(){
-  const grid=document.getElementById('name-grid');
-  grid.innerHTML='';
-  TEAMS[selectedTeam].members.forEach(m=>{
-    const btn=document.createElement('button');
-    btn.className='name-btn'+(myName===m?' active':'');
-    btn.textContent=m;
-    btn.addEventListener('click',()=>{
-      myName=m;
-      saveSetting('worktable-name-'+selectedTeam,m);
-      document.querySelectorAll('.name-btn').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-      setTimeout(()=>{
-        document.getElementById('name-modal').classList.remove('open');
-        renderMyCard();
-        renderCalendar();
-      },180);
-    });
-    grid.appendChild(btn);
-  });
-}
-
-// =============================================
-// 이벤트
-// =============================================
-document.getElementById('btn-select-name').addEventListener('click',()=>{
-  renderNameGrid();
-  document.getElementById('name-modal').classList.add('open');
-});
-document.getElementById('name-modal').addEventListener('click',e=>{
-  if(e.target===document.getElementById('name-modal'))
-    document.getElementById('name-modal').classList.remove('open');
-});
 document.getElementById('detail-modal').addEventListener('click',e=>{
   if(e.target===document.getElementById('detail-modal'))
     document.getElementById('detail-modal').classList.remove('open');
@@ -995,7 +948,6 @@ teamSelect.addEventListener('change',()=>{
   saveSetting('worktable-team',selectedTeam);
   myName=readSetting('worktable-name-'+selectedTeam);
   if(!TEAMS[selectedTeam].members.includes(myName))myName=null;
-  document.getElementById('name-modal').classList.remove('open');
   document.getElementById('detail-modal').classList.remove('open');
   renderMyCard();renderCalendar();
 });
@@ -1090,7 +1042,6 @@ function applyLinkedIdentity(identity){
  teamSelect.value=selectedTeam;
  saveSetting('worktable-team',selectedTeam);
  saveSetting('worktable-name-'+selectedTeam,myName);
- document.getElementById('name-modal').classList.remove('open');
  renderMyCard();renderCalendar();
  return true;
 }
