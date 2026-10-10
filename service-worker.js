@@ -1,44 +1,39 @@
-const CACHE_NAME = 'worktable-v6';
-const ASSETS = [
-  './',
-  './index.html',
-  './manifest.json',
-  './icons/icon-192.png',
-  './icons/icon-512.png'
-];
-
-// 설치: 핵심 파일 캐싱
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
-  );
-  self.skipWaiting();
+const CACHE_NAME='worktable-v7';
+const ASSETS=['./','./index.html','./manifest.json','./icons/icon-192.png','./icons/icon-512.png'];
+self.addEventListener('install',event=>{
+  event.waitUntil((async()=>{
+    const keys=await caches.keys();
+    await (await caches.open(CACHE_NAME)).addAll(ASSETS);
+    // One-time migration: older pages have no update button.
+    if(keys.some(key=>/^worktable-v[1-6]$/.test(key)))await self.skipWaiting();
+  })());
 });
-
-// 활성화: 이전 캐시 삭제
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key.startsWith('worktable-') && key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
-      )
-    )
-  );
-  self.clients.claim();
+self.addEventListener('message',event=>{
+  if(event.data && event.data.type==='SKIP_WAITING')self.skipWaiting();
 });
-
-// 요청 가로채기: 캐시 우선, 없으면 네트워크
-self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.open(CACHE_NAME).then(cache => cache.match(event.request)).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).then((response) => {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        return response;
-      });
-    })
-  );
+self.addEventListener('activate',event=>{
+  event.waitUntil((async()=>{
+    const keys=await caches.keys();
+    await Promise.all(keys.filter(key=>key.startsWith('worktable-')&&key!==CACHE_NAME).map(key=>caches.delete(key)));
+    await self.clients.claim();
+  })());
+});
+self.addEventListener('fetch',event=>{
+  const url=new URL(event.request.url);
+  if(event.request.method!=='GET'||url.origin!==self.location.origin||!url.pathname.startsWith('/worktable/'))return;
+  event.respondWith((async()=>{
+    const cache=await caches.open(CACHE_NAME);
+    if(event.request.mode==='navigate'){
+      try{
+        const response=await fetch(event.request,{cache:'no-store'});
+        if(response.ok){await cache.put(event.request,response.clone());return response;}
+      }catch{}
+      return await cache.match(event.request)||await cache.match('./index.html')||Response.error();
+    }
+    const cached=await cache.match(event.request);
+    if(cached)return cached;
+    const response=await fetch(event.request);
+    if(response.ok)await cache.put(event.request,response.clone());
+    return response;
+  })());
 });
