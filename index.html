@@ -128,7 +128,14 @@ body {
 .app-bar { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); gap:6px; padding-left:12px; padding-right:12px; }
 .app-bar-left { min-width:0; }
 .app-bar-left p { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.app-bar-actions { justify-self:end; gap:6px; }
+.app-bar-actions { grid-column:1 / -1; justify-self:end; gap:6px; }
+.header-tool { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; width:40px; height:38px; padding:2px; border:0; border-radius:8px; background:rgba(255,255,255,.15); color:white; font:inherit; font-size:10px; font-weight:700; cursor:pointer; }
+.header-tool:hover { background:rgba(255,255,255,.28); }
+.header-tool:focus-visible { outline:2px solid white; outline-offset:2px; }
+.app-bar-actions .shift-app-link { min-height:38px; padding:2px 5px; }
+.settings-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; }
+.settings-heading h2 { font-size:17px; }
+.settings-dialog .link-status { margin-top:14px; line-height:1.6; }
 .team-picker { justify-self:center; }
 .team-picker select { width:92px; height:34px; padding:4px 5px; border:1px solid rgba(255,255,255,.45); border-radius:7px; background:var(--steel); color:#fff; font:inherit; font-size:12px; font-weight:700; cursor:pointer; }
 .team-picker select:focus-visible { outline:2px solid #fff; outline-offset:2px; }
@@ -354,6 +361,13 @@ body {
       <select id="team-select" aria-label="근무조 선택"><option value="B">환원B조</option><option value="D">환원D조</option></select>
     </div>
     <div class="app-bar-actions">
+      <button type="button" class="header-tool" id="btn-open-link-settings" aria-haspopup="dialog" aria-controls="link-settings-dialog" title="교대근무 연동 설정">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2"/></svg><span>연동</span>
+      </button>
+      <button type="button" class="header-tool" id="btn-open-push-settings" aria-haspopup="dialog" aria-controls="push-settings-dialog" title="당일 근무 알림 설정">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span>알림</span>
+      </button>
+
       <a class="shift-app-link" href="https://gy7604.github.io/" aria-label="교대근무 앱으로 이동" title="교대근무로 이동">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect x="3" y="5" width="18" height="16" rx="2"/>
@@ -379,14 +393,6 @@ body {
     <button type="button" id="btn-update">업데이트 적용</button>
   </div>
 
-  <div class="link-panel">
-    <div class="link-tools"><strong>교대근무 연동</strong><button type="button" id="btn-link">계정 연결</button><button type="button" id="btn-link-refresh">새로고침</button><button type="button" id="btn-link-disconnect">연결 해제</button></div>
-    <div class="link-status" id="link-status" role="status">미연결 · 기본 배치표</div>
-  </div>
-  <div class="link-panel">
-    <div class="link-tools"><strong>당일 근무 알림</strong><button type="button" id="btn-work-push">알림 켜기</button><button type="button" id="btn-work-push-test">테스트</button><button type="button" id="btn-work-push-off">끄기</button></div>
-    <div class="link-status" id="work-push-status" role="status">주간 05:50 / 야간 17:50 · 휴무일 제외</div>
-  </div>
   <!-- 내 근무 카드 -->
   <div class="my-card" id="my-card"></div>
 
@@ -435,6 +441,21 @@ body {
     <button class="btn-close" id="btn-detail-close">닫기</button>
   </div>
 </div>
+
+<dialog id="link-settings-dialog" class="link-dialog settings-dialog" aria-labelledby="link-settings-dialog-title">
+ <div class="settings-heading"><h2 id="link-settings-dialog-title">교대근무 연동</h2><button type="button" data-close-dialog="link-settings-dialog" aria-label="교대근무 연동 설정 닫기">닫기</button></div>
+
+    <div class="link-tools"><button type="button" id="btn-link">계정 연결</button><button type="button" id="btn-link-refresh">새로고침</button><button type="button" id="btn-link-disconnect">연결 해제</button></div>
+    <div class="link-status" id="link-status" role="status">미연결 · 기본 배치표</div>
+
+</dialog>
+<dialog id="push-settings-dialog" class="link-dialog settings-dialog" aria-labelledby="push-settings-dialog-title">
+ <div class="settings-heading"><h2 id="push-settings-dialog-title">당일 근무 알림</h2><button type="button" data-close-dialog="push-settings-dialog" aria-label="당일 근무 알림 설정 닫기">닫기</button></div>
+
+    <div class="link-tools"><button type="button" id="btn-work-push">알림 켜기</button><button type="button" id="btn-work-push-test">테스트</button><button type="button" id="btn-work-push-off">끄기</button></div>
+    <div class="link-status" id="work-push-status" role="status">주간 05:50 / 야간 17:50 · 휴무일 제외</div>
+
+</dialog>
 
 <dialog id="link-dialog" class="link-dialog" aria-labelledby="link-title">
   <form id="link-form">
@@ -1087,7 +1108,15 @@ async function syncShift(force=false){
   else linkStatus.textContent=linkedRecords.length?'갱신 실패 · 마지막 확인 정보 표시':'조회 실패 · 기본 배치 표시';
  }finally{loadingLink=false;if(resyncLink){resyncLink=false;syncShift(true);}}
 }
+const linkSettingsDialog=document.getElementById('link-settings-dialog');
+const pushSettingsDialog=document.getElementById('push-settings-dialog');
+document.getElementById('btn-open-link-settings').addEventListener('click',()=>linkSettingsDialog.showModal());
+document.getElementById('btn-open-push-settings').addEventListener('click',()=>{pushSettingsDialog.showModal();checkWorkPush();});
+for(const id of ['link-settings-dialog','push-settings-dialog']) {
+ document.querySelector('[data-close-dialog="'+id+'"]').addEventListener('click',()=>document.getElementById(id).close());
+}
 document.getElementById('btn-link').addEventListener('click',()=>{
+ linkSettingsDialog.close();
  document.getElementById('link-message').textContent='';
  linkDialog.showModal();linkCode.focus();
 });
