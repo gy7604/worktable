@@ -114,6 +114,13 @@ body {
 .my-info-off  { font-size: 17px; font-weight: 700; color: var(--ink-sub); }
 .my-no-name   { text-align: center; width: 100%; padding: 14px 0; color: var(--ink-sub); font-size: 12px; font-weight: 600; }
 
+/* 조 선택 및 업데이트 */
+.team-picker { display:flex; align-items:center; gap:12px; margin:14px 14px 0; }
+.team-picker label { font-weight:700; color:var(--steel); }
+.team-picker select { flex:1; min-height:44px; padding:8px 12px; border:1px solid var(--border); border-radius:9px; background:var(--surface); color:var(--ink); font:inherit; font-size:14px; }
+.update-panel { margin:12px 14px 0; padding:12px; border-radius:10px; background:var(--steel-lt); }
+.update-panel[hidden] { display:none; }
+.update-panel button { margin-top:8px; padding:10px 16px; border:0; border-radius:8px; background:var(--steel); color:white; font:inherit; font-weight:700; cursor:pointer; }
 /* ── 달력 영역 ── */
 .cal-section { padding: 14px 10px 32px; }
 .cal-nav {
@@ -348,6 +355,14 @@ body {
     <p class="install-help" id="install-help" role="status" hidden></p>
   </div>
 
+  <div class="update-panel" id="update-panel" hidden role="status">
+    <div>새 버전이 준비되었습니다.</div>
+    <button type="button" id="btn-update">업데이트 적용</button>
+  </div>
+  <div class="team-picker">
+    <label for="team-select">근무조</label>
+    <select id="team-select"><option value="B">환원B조</option><option value="D">환원D조</option></select>
+  </div>
   <!-- 내 근무 카드 -->
   <div class="my-card" id="my-card"></div>
 
@@ -401,6 +416,13 @@ body {
 // =============================================
 // 근무 계산 엔진
 // =============================================
+function readSetting(key){try{return localStorage.getItem(key);}catch{return null;}}
+function saveSetting(key,value){try{localStorage.setItem(key,value);}catch{}}
+const TEAMS={
+  B:{label:'환원B조',members:['이영식','강신혁','김영진','장경준','홍찬표']},
+  D:{label:'환원D조',members:['홍동완','양석진','황호현','김종구','최정목']}
+};
+let selectedTeam=readSetting('worktable-team')==='D'?'D':'B';
 const MEMBERS    = ['이영식','강신혁','김영진','장경준','홍찬표'];
 const PATTERN    = ['D','D','O','O','N','N','O','O'];
 const BASE_DATE  = new Date(2026, 9, 1);
@@ -482,7 +504,34 @@ function runSimUntil(targetDate){
   }
 }
 
+const dCache={};
+let dState={ccr1:0,ccr2:4,nextIdx:[0,2,0,1,0],lastDay:0};
+function getDAsgn(date){
+  const start=new Date(2026,9,1);
+  const target=dayDiff(date,start)+1;
+  if(target<1)return {shift:'U'};
+  for(let day=dState.lastDay+1;day<=target;day++){
+    const phase=(5+day-1)%8,shift=PATTERN[phase];
+    const row={shift};
+    if(shift!=='O'&&shift!=='U'){
+      if(day>1&&(phase===0||phase===4)){
+        const incoming=(dState.ccr1+1)%5;
+        dState.nextIdx[dState.ccr2]=dState.nextIdx[incoming];
+        dState.ccr2=dState.ccr1;dState.ccr1=incoming;
+      }
+      row.ccr1=TEAMS.D.members[dState.ccr1];row.ccr2=TEAMS.D.members[dState.ccr2];
+      ['kiln','pellet','clean'].forEach(key=>row[key]='-');
+      for(let i=0;i<5;i++)if(i!==dState.ccr1&&i!==dState.ccr2){
+        row[['kiln','pellet','clean'][dState.nextIdx[i]]]=TEAMS.D.members[i];
+        dState.nextIdx[i]=(dState.nextIdx[i]+2)%3;
+      }
+    }
+    dCache[day]=row;dState.lastDay=day;
+  }
+  return dCache[target];
+}
 function getAsgn(date){
+  if(selectedTeam==='D')return getDAsgn(date);
   const key=dateKey(date);
   if(!cache[key]){
     const end=new Date(date.getFullYear(),date.getMonth()+1,0);
@@ -492,7 +541,7 @@ function getAsgn(date){
 }
 
 function getMyPos(asgn,name){
-  if(!asgn||asgn.shift==='O'||!name)return null;
+  if(!asgn||asgn.shift==='O'||asgn.shift==='U'||!name)return null;
   if(asgn.ccr1===name)return'CCR 1기';
   if(asgn.ccr2===name)return'CCR 2기';
   if(asgn.kiln===name)return'Kiln';
@@ -507,7 +556,8 @@ function getMyPos(asgn,name){
 const today=new Date(); today.setHours(0,0,0,0);
 let viewYear=today.getFullYear();
 let viewMonth=today.getMonth()+1;
-let myName=null;
+let myName=readSetting('worktable-name-'+selectedTeam);
+if(!TEAMS[selectedTeam].members.includes(myName))myName=null;
 
 const WDAYS=['일','월','화','수','목','금','토'];
 const MNAMES=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
@@ -612,7 +662,7 @@ function renderCalendar(){
     head.appendChild(dateRow);
 
     // 근무유형 라벨
-    if(shift!=='O'){
+    if(shift!=='O'&&shift!=='U'){
       const lbl=document.createElement('span');
       lbl.className='cell-shift-label';
       lbl.textContent=shift==='D'?'주간':'야간';
@@ -624,10 +674,10 @@ function renderCalendar(){
     const body=document.createElement('div');
     body.className='cell-body';
 
-    if(shift==='O'){
+    if(shift==='O'||shift==='U'){
       const offTxt=document.createElement('div');
       offTxt.className='cell-off-text';
-      offTxt.textContent='휴무';
+      offTxt.textContent=shift==='U'?'기준일 이전':'휴무';
       body.appendChild(offTxt);
     } else {
       POS_DEFS.forEach(def=>{
@@ -669,12 +719,14 @@ function openDetail(date,asgn){
   const shiftTxt=asgn.shift==='D'?'주간 근무 (07:00–19:00)':asgn.shift==='N'?'야간 근무 (19:00–07:00)':'휴무';
   document.getElementById('detail-date').textContent=
     `${date.getFullYear()}년 ${date.getMonth()+1}월 ${date.getDate()}일 (${WDAYS[dow]})`;
-  document.getElementById('detail-title').textContent=shiftTxt;
+  document.getElementById('detail-title').textContent=asgn.shift==='U'?'배치 정보 없음':shiftTxt;
 
   const rowsEl=document.getElementById('detail-rows');
   rowsEl.innerHTML='';
 
-  if(asgn.shift==='O'){
+  if(asgn.shift==='U'){
+    rowsEl.textContent='환원D조 배치는 2026년 10월 1일부터 제공됩니다.';
+  } else if(asgn.shift==='O'){
     rowsEl.innerHTML='<div style="text-align:center;padding:18px;color:var(--ink-sub);font-size:13px;">전원 휴무</div>';
   } else {
     POS_DEFS.forEach(def=>{
@@ -697,12 +749,13 @@ function openDetail(date,asgn){
 function renderNameGrid(){
   const grid=document.getElementById('name-grid');
   grid.innerHTML='';
-  MEMBERS.forEach(m=>{
+  TEAMS[selectedTeam].members.forEach(m=>{
     const btn=document.createElement('button');
     btn.className='name-btn'+(myName===m?' active':'');
     btn.textContent=m;
     btn.addEventListener('click',()=>{
       myName=m;
+      saveSetting('worktable-name-'+selectedTeam,m);
       document.querySelectorAll('.name-btn').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
       setTimeout(()=>{
@@ -824,6 +877,17 @@ calendarViewport.addEventListener('touchcancel',()=>{
 // =============================================
 // 초기화
 // =============================================
+const teamSelect=document.getElementById('team-select');
+teamSelect.value=selectedTeam;
+teamSelect.addEventListener('change',()=>{
+  selectedTeam=teamSelect.value;
+  saveSetting('worktable-team',selectedTeam);
+  myName=readSetting('worktable-name-'+selectedTeam);
+  if(!TEAMS[selectedTeam].members.includes(myName))myName=null;
+  document.getElementById('name-modal').classList.remove('open');
+  document.getElementById('detail-modal').classList.remove('open');
+  renderMyCard();renderCalendar();
+});
 document.getElementById('today-label').textContent=
   `${today.getFullYear()}년 ${today.getMonth()+1}월 ${today.getDate()}일 (${WDAYS[today.getDay()]})`;
 
@@ -893,10 +957,41 @@ installButton.addEventListener('click',async()=>{
 });
 
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>{
-navigator.serviceWorker.register('./service-worker.js', { scope: '/worktable/', updateViaCache: 'none' })
-      .catch(e=>console.log('SW 등록 실패:',e));
+  let appRegistration=null;
+  let updateRequested=false;
+  const updatePanel=document.getElementById('update-panel');
+  const updateButton=document.getElementById('btn-update');
+  function showUpdate(){
+    updatePanel.hidden=!(appRegistration && appRegistration.waiting && navigator.serviceWorker.controller);
+  }
+  updateButton.addEventListener('click',()=>{
+    const waiting=appRegistration && appRegistration.waiting;
+    if(!waiting)return;
+    updateRequested=true;
+    updateButton.disabled=true;
+    updateButton.textContent='업데이트 중…';
+    waiting.postMessage({type:'SKIP_WAITING'});
   });
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(updateRequested)window.location.reload();
+  });
+  async function checkUpdate(){
+    if(!appRegistration || !navigator.onLine)return;
+    try{await appRegistration.update();showUpdate();}catch(error){console.log('업데이트 확인 실패:',error);}
+  }
+  window.addEventListener('load',async()=>{
+    try{
+      appRegistration=await navigator.serviceWorker.register('./service-worker.js',{scope:'/worktable/',updateViaCache:'none'});
+      showUpdate();
+      appRegistration.addEventListener('updatefound',()=>{
+        const installing=appRegistration.installing;
+        if(installing)installing.addEventListener('statechange',showUpdate);
+      });
+      checkUpdate();
+    }catch(error){console.log('SW 등록 실패:',error);}
+  });
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkUpdate();});
+  window.addEventListener('online',checkUpdate);
 }
 </script>
 </body>
