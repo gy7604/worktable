@@ -17,10 +17,10 @@ function validSubscription(sub:any){
 function findWork(name:string,date:Date,records:any[],shift:string){
  for(const team of ['B','D']){
   const a=assignment(team,date,records);
-  if(a.shift!==shift)continue;
+  if(a.shift!==shift||a.off?.includes(name))continue;
   for(const [role,label] of Object.entries({ccr1:'1기 CCR',ccr2:'2기 CCR',kiln:'Kiln',pellet:'Pellet',clean:'청정'}))if(a[role]===name){
    const uncertain=/규칙 확인 필요|관리자 확인/.test(a.note||'');
-   return {team,role:label,note:uncertain?'휴무 변동이 있어 담당 포지션을 확인해 주세요.':a.note};
+   return {team,role:label+(a.fieldConfirmation&&['kiln','pellet','clean'].includes(role)?' (확인)':''),note:uncertain?'휴무 변동이 있어 담당 포지션을 확인해 주세요.':a.note};
   }
   if(a.changed&&TEAMS[team].members.includes(name)&&!a.off?.includes(name)&&['kiln','pellet','clean'].some(role=>a[role]==='당일 확인'))return {team,role:'현장 · 당일 확인',note:'현장 배치를 당일 확인해 주세요.'};
   // Unspecified multi-helper allocation must not silently suppress a known substitution shift.
