@@ -615,6 +615,12 @@ function applyDailyChanges(base,date,records,team=selectedTeam){
   for(const a of first){for(const b of second)if(a!==b&&!forbidden(a,b)){pair=[a,b];break;}if(pair)break;}
   if(!pair)return unconfirmed('CCR 배치 가능한 조합 없음 · 관리자 확인 필요');
   result.ccr1=pair[0];result.ccr2=pair[1];
+  if(off.size>=2){
+    for(const role of ['kiln','pellet','clean'])result[role]=base[role];
+    result.fieldConfirmation=true;
+    result.note='운전실 규칙 배치 · 현장 기존 배치 확인 필요';
+    return result;
+  }
   if(helpers.length>1)return unconfirmed('운전실 규칙 배치 · 현장 당일 확인');
   const used=new Set(pair);
   if(helpers.length===1){result.pellet=helpers[0];used.add(helpers[0]);}
@@ -635,12 +641,12 @@ function applyDailyChanges(base,date,records,team=selectedTeam){
 function getAsgn(date){return applyDailyChanges(getBaseAsgn(date),date,linkedRecords);}
 
 function getMyPos(asgn,name){
-  if(!asgn||asgn.shift==='O'||asgn.shift==='U'||!name)return null;
+  if(!asgn||asgn.shift==='O'||asgn.shift==='U'||!name||asgn.off?.includes(name))return null;
   if(asgn.ccr1===name)return'CCR 1기';
   if(asgn.ccr2===name)return'CCR 2기';
-  if(asgn.kiln===name)return'Kiln';
-  if(asgn.pellet===name)return'Pellet';
-  if(asgn.clean===name)return'청정';
+  if(asgn.kiln===name)return asgn.fieldConfirmation?'Kiln (확인)':'Kiln';
+  if(asgn.pellet===name)return asgn.fieldConfirmation?'Pellet (확인)':'Pellet';
+  if(asgn.clean===name)return asgn.fieldConfirmation?'청정 (확인)':'청정';
   return null;
 }
 
@@ -685,7 +691,7 @@ function renderMyCard(){
   } else {
     const def=POS_DEFS.find(d=>
       (d.key==='ccr1'&&pos==='CCR 1기')||(d.key==='ccr2'&&pos==='CCR 2기')||
-      (d.key==='kiln'&&pos==='Kiln')||(d.key==='pellet'&&pos==='Pellet')||(d.key==='clean'&&pos==='청정')
+      (d.key==='kiln'&&pos.replace(' (확인)','')==='Kiln')||(d.key==='pellet'&&pos.replace(' (확인)','')==='Pellet')||(d.key==='clean'&&pos.replace(' (확인)','')==='청정')
     );
     bodyHtml=`<div class="my-card-body">
       <div class="my-badge" style="background:${def.bgVar};color:${def.colVar};">${pos}</div>
@@ -784,9 +790,9 @@ function renderCalendar(){
 
         const nm=document.createElement('span');
         const memberName=asgn[def.key];
-        const isMineRow=myName&&memberName===myName;
+        const isMineRow=myName&&memberName===myName&&!asgn.off?.includes(myName)&&(!asgn.fieldConfirmation||['ccr1','ccr2'].includes(def.key)||![asgn.ccr1,asgn.ccr2].includes(myName));
         nm.className='p-name'+(isMineRow?' mine':'');
-        nm.textContent=memberName;
+        nm.textContent=memberName+(asgn.fieldConfirmation&&['kiln','pellet','clean'].includes(def.key)?' (확인)':'');
 
         row.appendChild(lbl);
         row.appendChild(nm);
@@ -826,12 +832,12 @@ function openDetail(date,asgn){
   } else {
     POS_DEFS.forEach(def=>{
       const mn=asgn[def.key];
-      const isMine=myName&&mn===myName;
+      const isMine=myName&&mn===myName&&!asgn.off?.includes(myName)&&(!asgn.fieldConfirmation||['ccr1','ccr2'].includes(def.key)||![asgn.ccr1,asgn.ccr2].includes(myName));
       const row=document.createElement('div');
       row.className='d-row '+def.drCls;
       row.innerHTML=`
         <span class="d-row-label ${def.dlCls}">${DETAIL_LABELS[def.key]}</span>
-        <span class="d-row-name${isMine?' mine':''}">${escapeName(mn)}${isMine?'<span class="mine-tag">나</span>':''}</span>`;
+        <span class="d-row-name${isMine?' mine':''}">${escapeName(mn)}${asgn.fieldConfirmation&&['kiln','pellet','clean'].includes(def.key)?' (확인)':''}${isMine?'<span class="mine-tag">나</span>':''}</span>`;
       rowsEl.appendChild(row);
     });
   }
