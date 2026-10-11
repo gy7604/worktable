@@ -145,6 +145,12 @@ function applyDailyChanges(base,date,records,team=selectedTeam){
   for(const a of first){for(const b of second)if(a!==b&&!forbidden(a,b)){pair=[a,b];break;}if(pair)break;}
   if(!pair)return unconfirmed('CCR 배치 가능한 조합 없음 · 관리자 확인 필요');
   result.ccr1=pair[0];result.ccr2=pair[1];
+  if(off.size>=2){
+    for(const role of ['kiln','pellet','clean'])result[role]=base[role];
+    result.fieldConfirmation=true;
+    result.note='운전실 규칙 배치 · 현장 기존 배치 확인 필요';
+    return result;
+  }
   if(helpers.length>1)return unconfirmed('운전실 규칙 배치 · 현장 당일 확인');
   const used=new Set(pair);
   if(helpers.length===1){result.pellet=helpers[0];used.add(helpers[0]);}
