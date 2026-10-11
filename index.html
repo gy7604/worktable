@@ -634,8 +634,8 @@ function applyDailyChanges(base,date,records,team=selectedTeam){
   for(const role of ['kiln','clean'])if(result[role]==='공석'&&remaining.length){result[role]=remaining.shift();used.add(result[role]);}
   if(!helpers.length&&!off.has(base.pellet)&&!used.has(base.pellet)){result.pellet=base.pellet;used.add(base.pellet);}
   if(remaining.some(n=>!used.has(n)))return unconfirmed('현장 배치 규칙 확인 필요');
-  for(const role of ['kiln','pellet','clean'])if(result[role]==='공석')result[role]='당일 확인';
-  result.note=helpers.length===1?'휴무 반영 · 대근자 Pellet 배치 · 당일만 변경':'휴무 반영 · 현장 당일 확인';
+  for(const role of ['kiln','pellet','clean'])if(result[role]==='공석')result[role]=helpers.length===0?'대근자 미정':'당일 확인';
+  result.note=helpers.length===1?'휴무 반영 · 대근자 Pellet 배치 · 당일만 변경':'휴무 반영 · 대근자 미정';
   return result;
 }
 function getAsgn(date){return applyDailyChanges(getBaseAsgn(date),date,linkedRecords);}
