@@ -801,7 +801,6 @@ function renderCalendar(){
     }
 
     cell.appendChild(body);
-    if(asgn.changed){const tag=document.createElement('div');tag.className='adjusted-label';tag.textContent=asgn.note.includes('확인 필요')||asgn.note.includes('관리자')?'배치 확인 필요':'당일 변경';cell.appendChild(tag);}
     cell.addEventListener('click',()=>{
       if(Date.now()<suppressCalendarClickUntil || calendarSliding)return;
       openDetail(date,asgn);
