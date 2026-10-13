@@ -11,20 +11,20 @@ public class ShiftWidget extends AppWidgetProvider {
  String[] lines=new String[7];Arrays.fill(lines,"");
  TimeZone zone=TimeZone.getTimeZone("Asia/Seoul");Calendar cal=Calendar.getInstance(zone);
  SimpleDateFormat key=new SimpleDateFormat("yyyy-MM-dd",Locale.US);key.setTimeZone(zone);
- SimpleDateFormat label=new SimpleDateFormat("M/d (E)",Locale.KOREA);label.setTimeZone(zone);
+ SimpleDateFormat label=new SimpleDateFormat("M/d\nE",Locale.KOREA);label.setTimeZone(zone);
  try{
  JSONArray days=new JSONArray(AlarmStore.prefs(c).getString("workdays","[]"));
- for(int n=0;n<7;n++){String date=key.format(cal.getTime());String value="일정 갱신 필요";
+ for(int n=0;n<7;n++){String date=key.format(cal.getTime());String value="갱신필요";
  for(int j=0;j<days.length();j++){JSONObject d=days.getJSONObject(j);if(!date.equals(d.optString("date")))continue;
  JSONArray work=d.getJSONArray("work"),off=d.getJSONArray("off");StringBuilder b=new StringBuilder(d.getString("regular"));
- for(int k=0;k<work.length();k++){JSONObject w=work.getJSONObject(k);if("대근".equals(w.getString("source")))b.append(" · ").append(w.getString("shift")).append(" 대근");}
+ for(int k=0;k<work.length();k++){JSONObject w=work.getJSONObject(k);if("대근".equals(w.getString("source")))b.append("\n").append(w.getString("shift").equals("야간")?"야대근":"주대근");}
  
- if(off.length()>0){b.append(" · 본인 휴무");b.append(" (");for(int k=0;k<off.length();k++){if(k>0)b.append("/");b.append(off.getString(k));}b.append(")");}
+ if(off.length()>0)b.append("\n내휴무");
  value=b.toString();break;}
- lines[n]=label.format(cal.getTime())+"  "+value;cal.add(Calendar.DATE,1);}
- }catch(Exception e){lines[0]="일정을 읽을 수 없습니다. 앱에서 동기화해 주세요.";}
+ lines[n]=label.format(cal.getTime())+"\n"+value;cal.add(Calendar.DATE,1);}
+ }catch(Exception e){lines[0]="동기화\n필요";}
  int[] rows={R.id.day0,R.id.day1,R.id.day2,R.id.day3,R.id.day4,R.id.day5,R.id.day6};
- for(int n=0;n<7;n++)v.setTextViewText(rows[n],connected?lines[n]:(n==0?"교대 기상 알람 앱에서 계정을 연결해 주세요.":""));
+ for(int n=0;n<7;n++){v.setTextViewText(rows[n],connected?lines[n]:(n==0?"계정\n연결필요":""));v.setContentDescription(rows[n],"B조 "+lines[n].replace('\n',' '));}
  long synced=AlarmStore.prefs(c).getLong("synced",0);
  SimpleDateFormat stamp=new SimpleDateFormat("M/d HH:mm",Locale.KOREA);stamp.setTimeZone(zone);
  String footer=synced==0?"아직 동기화되지 않음":"갱신 "+stamp.format(new Date(synced));
