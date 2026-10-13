@@ -26,6 +26,7 @@ jobs:
       - name: Check schedule rules and reject anonymous API requests
         run: |
           node android-alarm-test/backend/schedule.test.mjs
+          node android-alarm-test/backend/widget.test.mjs
           status=$(curl --silent --show-error --max-time 30 --output /tmp/alarm-api.json --write-out '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"action":"sync"}' https://lqqjyedfwlqinppcrvjf.supabase.co/functions/v1/app-alarm)
           test "$status" = "401"
           status=$(curl --silent --show-error --max-time 30 --output /tmp/alarm-api.json --write-out '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"action":"exchange","code":"invalid"}' https://lqqjyedfwlqinppcrvjf.supabase.co/functions/v1/app-alarm)
