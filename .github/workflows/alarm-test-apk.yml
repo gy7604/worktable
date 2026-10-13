@@ -6,7 +6,10 @@ on:
       - '.github/workflows/alarm-test-apk.yml'
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
+concurrency:
+  group: alarm-release
+  cancel-in-progress: true
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -61,6 +64,26 @@ jobs:
           name: shift-alarm-signed-apk
           path: android-alarm-test/app/build/outputs/apk/release/app-release.apk
           retention-days: 30
+      - name: Create update metadata
+        run: |
+          python3 - <<'PY'
+          import json, re
+          from pathlib import Path
+          text = Path('android-alarm-test/app/build.gradle').read_text()
+          code = int(re.search(r'versionCode (\d+)', text).group(1))
+          name = re.search(r"versionName '([^']+)'", text).group(1)
+          Path('update.json').write_text(json.dumps({'versionCode': code, 'versionName': name}))
+          PY
+      - name: Publish signed app update
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: shift-alarm-current
+          name: 교대 기상 알람 최신 버전
+          prerelease: true
+          make_latest: false
+          files: |
+            android-alarm-test/app/build/outputs/apk/release/app-release.apk
+            update.json
       - name: Remove private signing key
         if: always()
         run: rm -f "$RUNNER_TEMP/shift-alarm.p12"
