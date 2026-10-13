@@ -15,13 +15,15 @@ public class MainActivity extends Activity {
   button(box,"예약 일정·알람 상태 확인",()->showSchedule());
   button(box,"알림·정확한 알람 권한",this::permissionSettings);
   button(box,"알람 작동 점검",this::diagnostics);
+  button(box,"업데이트 확인",()->UpdateCheck.check(this,true));
   button(box,"배터리·백그라운드 설정",()->startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName()))));
-  button(box,"2분 뒤 테스트 알람",()->{if(!permissions()){permissionSettings();return;}AlarmStore.set(this,AlarmStore.TEST,System.currentTimeMillis()+120000L,"2분 테스트 알람");status.setText("2분 뒤 테스트 알람을 등록했습니다.");});
+  button(box,"1분 뒤 테스트 알람",()->{if(!permissions()){permissionSettings();return;}AlarmStore.set(this,AlarmStore.TEST,System.currentTimeMillis()+60000L,"1분 테스트 알람");status.setText("1분 뒤 테스트 알람을 등록했습니다.");});
   button(box,"테스트 알람 취소",()->{AlarmStore.cancel(this,AlarmStore.TEST);status.setText("테스트 알람을 취소했습니다.");});
   button(box,"울리는 알람 끄기",()->stopService(new Intent(this,RingService.class)));
   button(box,"5분 미루기",()->{AlarmStore.set(this,AlarmStore.SNOOZE,System.currentTimeMillis()+300000L,"5분 뒤 다시 알림");stopService(new Intent(this,RingService.class));status.setText("5분 뒤 다시 울립니다.");});
   button(box,"이 기기 연결 해제",()->new AlertDialog.Builder(this).setMessage("이 기기의 근무 기상 알람과 계정 연결을 해제할까요?").setPositiveButton("해제",(d,w)->{AlarmStore.stop(this);AlarmStore.prefs(this).edit().clear().commit();AlarmStore.jobs(this);refresh();}).setNegativeButton("취소",null).show());
   status=text(box,"",16);box.removeView(status);box.addView(status,2);text(box,"일정은 앱을 열 때와 백그라운드에서 주기적으로 갱신합니다. 절전·인터넷 상태에 따라 갱신이 늦을 수 있으니 급한 일정 변경 후에는 ‘지금 일정 동기화’를 눌러 주세요.\n인터넷 연결 실패 시 마지막으로 받은 31일 일정을 유지합니다. 휴대폰 전원 끄기·앱 강제 종료·알람 권한 해제 상태에서는 울리지 않을 수 있습니다.\n이 앱의 기상 알람은 삼성 시계 및 교대근무 앱의 공지 알림과 별개입니다.",14);
+  UpdateCheck.check(this,false);
  }
  @Override public void onResume(){super.onResume();AlarmStore.restore(this);AlarmStore.jobs(this);refresh();if(!AlarmStore.prefs(this).getString("token","").isEmpty())background(()->AlarmStore.sync(this));}
  private boolean permissions(){return AlarmStore.exact(this)&&(Build.VERSION.SDK_INT<33||checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)==getPackageManager().PERMISSION_GRANTED)&&(Build.VERSION.SDK_INT<24||getSystemService(NotificationManager.class).areNotificationsEnabled());}
