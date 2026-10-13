@@ -27,7 +27,22 @@ public class MainActivity extends Activity {
  }
  @Override public void onResume(){super.onResume();AlarmStore.restore(this);AlarmStore.jobs(this);refresh();if(!AlarmStore.prefs(this).getString("token","").isEmpty())background(()->AlarmStore.sync(this));}
  private boolean permissions(){return AlarmStore.exact(this)&&(Build.VERSION.SDK_INT<33||checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)==getPackageManager().PERMISSION_GRANTED)&&(Build.VERSION.SDK_INT<24||getSystemService(NotificationManager.class).areNotificationsEnabled());}
- private void permissionSettings(){if(Build.VERSION.SDK_INT>=31&&!AlarmStore.exact(this)){startActivity(new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,Uri.parse("package:"+getPackageName())));return;}if(Build.VERSION.SDK_INT>=24&&!getSystemService(NotificationManager.class).areNotificationsEnabled()){startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName())));return;}if(Build.VERSION.SDK_INT>=34&&!getSystemService(NotificationManager.class).canUseFullScreenIntent()){startActivity(new Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,Uri.parse("package:"+getPackageName())));return;}status.setText("알람 권한이 허용되어 있습니다. 휴대폰 설정에서 알람 음량도 확인해 주세요.");}
+ private void permissionSettings(){
+ NotificationManager nm=getSystemService(NotificationManager.class);
+ String exact=AlarmStore.exact(this)?"허용":"필요";
+ String notifications=(Build.VERSION.SDK_INT<24||nm.areNotificationsEnabled())?"허용":"필요";
+ String full=(Build.VERSION.SDK_INT<34||nm.canUseFullScreenIntent())?"허용":"필요";
+ new AlertDialog.Builder(this).setTitle("알람 권한 설정")
+ .setMessage("앱 알림: "+notifications+"\n정확한 알람: "+exact+"\n전체화면 알람: "+full+"\n\n허용 상태에서도 아래 버튼으로 설정을 열 수 있습니다.")
+ .setPositiveButton("전체화면 설정",(d,w)->openPermission(Build.VERSION.SDK_INT>=34?Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT:Settings.ACTION_APPLICATION_DETAILS_SETTINGS))
+ .setNeutralButton("정확한 알람",(d,w)->openPermission(Build.VERSION.SDK_INT>=31?Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM:Settings.ACTION_APPLICATION_DETAILS_SETTINGS))
+ .setNegativeButton("앱 알림",(d,w)->{
+ try{if(Build.VERSION.SDK_INT>=26)startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,getPackageName()));else openPermission(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);}
+ catch(ActivityNotFoundException e){openPermission(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);}
+ }).show();
+ }
+ private void openPermission(String action){try{startActivity(new Intent(action,Uri.parse("package:"+getPackageName())));}catch(ActivityNotFoundException e){startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName())));}}
+
  private void refresh(){ShiftWidget.refresh(this);if(status==null)return;refreshing=true;boolean on=AlarmStore.prefs(this).getBoolean("enabled",false);enabled.setChecked(on);refreshing=false;long synced=AlarmStore.prefs(this).getLong("synced",0);String last=synced==0?"아직 없음":new SimpleDateFormat("MM/dd HH:mm",Locale.KOREA).format(new Date(synced));status.setText("설정 시간: 주간 "+AlarmStore.wakeTime(this,false)+" / 야간 "+AlarmStore.wakeTime(this,true)+"\n기상 알람: "+(on?(AlarmStore.exact(this)?"켜짐":"권한 필요 · 예약 불가"):"꺼짐")+"\n향후 알람 일정: "+AlarmStore.countFuture(this)+"개 (기기에 다음 1개 예약)\n연결 계정: "+AlarmStore.prefs(this).getString("name","미연결")+"\n다음 알람: "+AlarmStore.prefs(this).getString("next","없음")+"\n최근 동기화: "+last+"\n"+AlarmStore.prefs(this).getString("error","")+(permissions()?"":"\n알림·정확한 알람 권한을 확인해 주세요."));}
  private void showSchedule(){try{org.json.JSONArray a=AlarmStore.plan(this);StringBuilder b=new StringBuilder();int n=0;for(int i=0;i<a.length();i++){org.json.JSONObject x=a.getJSONObject(i);if(x.getLong("at")<=System.currentTimeMillis())continue;b.append(x.getString("date")).append("  ").append(x.getString("time")).append("  ").append(x.getString("shift")).append("  ").append(x.getString("source")).append("\n");n++;}if(n==0)b.append("예정된 알람이 없습니다.\n휴무일이거나 아직 동기화되지 않았습니다.");new AlertDialog.Builder(this).setTitle("예약 일정·알람 상태").setMessage(b.toString()).setPositiveButton("확인",null).show();}catch(Exception e){new AlertDialog.Builder(this).setTitle("예약 일정").setMessage("일정 정보를 읽을 수 없습니다. 먼저 동기화해 주세요.").setPositiveButton("확인",null).show();}}
 
