@@ -7,7 +7,7 @@ public class ShiftWidget extends AppWidgetProvider {
  static void render(Context c,AppWidgetManager m,int id){
  RemoteViews v=new RemoteViews(c.getPackageName(),R.layout.shift_widget);
  boolean connected=!AlarmStore.prefs(c).getString("token","").isEmpty();
- v.setTextViewText(R.id.widget_title,connected?AlarmStore.prefs(c).getString("name","")+" · 일주일 근무":"교대근무 · 계정 연결 필요");
+ v.setTextViewText(R.id.widget_title,connected?AlarmStore.prefs(c).getString("name","")+" · B조 일주일 근무":"교대근무 · 계정 연결 필요");
  String[] lines=new String[7];Arrays.fill(lines,"");
  TimeZone zone=TimeZone.getTimeZone("Asia/Seoul");Calendar cal=Calendar.getInstance(zone);
  SimpleDateFormat key=new SimpleDateFormat("yyyy-MM-dd",Locale.US);key.setTimeZone(zone);
@@ -17,7 +17,7 @@ public class ShiftWidget extends AppWidgetProvider {
  for(int n=0;n<7;n++){String date=key.format(cal.getTime());String value="일정 갱신 필요";
  for(int j=0;j<days.length();j++){JSONObject d=days.getJSONObject(j);if(!date.equals(d.optString("date")))continue;
  JSONArray work=d.getJSONArray("work"),off=d.getJSONArray("off");StringBuilder b=new StringBuilder();
- for(int k=0;k<work.length();k++){JSONObject w=work.getJSONObject(k);if(b.length()>0)b.append(" / ");b.append(w.getString("shift"));if("대근".equals(w.getString("source")))b.append(" 대근");b.append(" ").append(w.getString("hours"));}
+ for(int k=0;k<work.length();k++){JSONObject w=work.getJSONObject(k);if(b.length()>0)b.append(" / ");b.append(w.getString("shift"));if("대근".equals(w.getString("source")))b.append(" 대근");}
  if(work.length()==0)b.append(off.length()>0?"본인 휴무":"휴무");
  if(off.length()>0){if(work.length()>0)b.append(" · 본인 휴무");b.append(" (");for(int k=0;k<off.length();k++){if(k>0)b.append("/");b.append(off.getString(k));}b.append(")");}
  value=b.toString();break;}
