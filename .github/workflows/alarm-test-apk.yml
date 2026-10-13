@@ -30,6 +30,8 @@ jobs:
         run: |
           node android-alarm-test/backend/schedule.test.mjs
           node android-alarm-test/backend/widget.test.mjs
+          javac -d /tmp/alarm-time-tests android-alarm-test/app/src/main/java/io/github/gy7604/alarmtest/AlarmTime.java android-alarm-test/tests/AlarmTimeRegression.java
+          java -cp /tmp/alarm-time-tests io.github.gy7604.alarmtest.AlarmTimeRegression
           status=$(curl --silent --show-error --max-time 30 --output /tmp/alarm-api.json --write-out '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"action":"sync"}' https://lqqjyedfwlqinppcrvjf.supabase.co/functions/v1/app-alarm)
           test "$status" = "401"
           status=$(curl --silent --show-error --max-time 30 --output /tmp/alarm-api.json --write-out '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"action":"exchange","code":"invalid"}' https://lqqjyedfwlqinppcrvjf.supabase.co/functions/v1/app-alarm)
