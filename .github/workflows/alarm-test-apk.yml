@@ -31,11 +31,36 @@ jobs:
           test "$status" = "401"
           status=$(curl --silent --show-error --max-time 30 --output /tmp/alarm-api.json --write-out '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"action":"exchange","code":"invalid"}' https://lqqjyedfwlqinppcrvjf.supabase.co/functions/v1/app-alarm)
           test "$status" = "400"
+      - name: Restore private signing key
+        env:
+          SIGNING_JSON: ${{ secrets.SHIFT_ALARM_SIGNING_JSON }}
+        run: |
+          python3 - <<'PY'
+          import os, json, base64
+          from pathlib import Path
+          raw = os.environ.get('SIGNING_JSON', '')
+          if not raw:
+              raise SystemExit('Add repository secret SHIFT_ALARM_SIGNING_JSON using android-alarm-test/tools/setup-signing.ps1. No random debug APK will be published.')
+          data = json.loads(raw)
+          for field in ('keystore', 'password', 'alias'):
+              if not isinstance(data.get(field), str) or not data[field] or '\n' in data[field] or '\r' in data[field]:
+                  raise SystemExit('Invalid signing configuration')
+          print('::add-mask::' + data['password'])
+          path = Path(os.environ['RUNNER_TEMP']) / 'shift-alarm.p12'
+          path.write_bytes(base64.b64decode(data['keystore'], validate=True))
+          path.chmod(0o600)
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              for key, value in {'ALARM_KEYSTORE_PATH': str(path), 'ALARM_STORE_PASSWORD': data['password'], 'ALARM_KEY_ALIAS': data['alias'], 'ALARM_KEY_PASSWORD': data['password']}.items():
+                  f.write(key + '=' + value + '\n')
+          PY
       - name: Build and lint
         working-directory: android-alarm-test
-        run: gradle assembleDebug lintDebug --no-daemon
+        run: gradle assembleRelease lintRelease --no-daemon
       - uses: actions/upload-artifact@v4
         with:
-          name: shift-alarm-test-apk
-          path: android-alarm-test/app/build/outputs/apk/debug/app-debug.apk
+          name: shift-alarm-signed-apk
+          path: android-alarm-test/app/build/outputs/apk/release/app-release.apk
           retention-days: 30
+      - name: Remove private signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/shift-alarm.p12"
