@@ -16,10 +16,10 @@ public class ShiftWidget extends AppWidgetProvider {
  JSONArray days=new JSONArray(AlarmStore.prefs(c).getString("workdays","[]"));
  for(int n=0;n<7;n++){String date=key.format(cal.getTime());String value="갱신필요";
  for(int j=0;j<days.length();j++){JSONObject d=days.getJSONObject(j);if(!date.equals(d.optString("date")))continue;
- JSONArray work=d.getJSONArray("work"),off=d.getJSONArray("off");StringBuilder b=new StringBuilder(d.getString("regular"));
- for(int k=0;k<work.length();k++){JSONObject w=work.getJSONObject(k);if("대근".equals(w.getString("source")))b.append("\n").append(w.getString("shift").equals("야간")?"야대근":"주대근");}
+ JSONArray work=d.getJSONArray("work"),off=d.getJSONArray("off");StringBuilder b=new StringBuilder(d.getString("regular"));StringBuilder extra=new StringBuilder();
+ for(int k=0;k<work.length();k++){JSONObject w=work.getJSONObject(k);if("대근".equals(w.getString("source"))){if(extra.length()>0)extra.append("/");extra.append(w.getString("shift").equals("야간")?"야대":"주대");}}
  
- if(off.length()>0)b.append("\n내휴무");
+ if(off.length()>0){if(extra.length()>0)extra.append("/");extra.append("내휴");}if(extra.length()>0)b.append("\n").append(extra.length()>4?(off.length()>0?"휴·대":"주야대"):extra);
  value=b.toString();break;}
  lines[n]=label.format(cal.getTime())+"\n"+value;cal.add(Calendar.DATE,1);}
  }catch(Exception e){lines[0]="동기화\n필요";}
@@ -30,7 +30,7 @@ public class ShiftWidget extends AppWidgetProvider {
  String footer=synced==0?"아직 동기화되지 않음":"갱신 "+stamp.format(new Date(synced));
  if(!AlarmStore.prefs(c).getString("error","").isEmpty())footer+=" · 갱신 실패";
  else if(synced>0&&System.currentTimeMillis()-synced>3600000)footer+=" · 이전 일정";
- v.setTextViewText(R.id.widget_footer,footer+" · 눌러서 교대근무 열기");
+ v.setTextViewText(R.id.widget_footer,footer+" · 눌러서 교대근무 열기");v.setContentDescription(R.id.widget_root,footer+" · 주대는 주간 대근, 야대는 야간 대근, 내휴는 본인 휴무 · 눌러서 교대근무 열기");
  Intent open=new Intent(Intent.ACTION_VIEW,Uri.parse("https://gy7604.github.io/index.html"));
  v.setOnClickPendingIntent(R.id.widget_root,PendingIntent.getActivity(c,7610,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE));
  m.updateAppWidget(id,v);
