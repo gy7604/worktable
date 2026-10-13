@@ -12,16 +12,14 @@ final class AlarmStore {
  static JSONArray plan(Context c)throws Exception{
  JSONArray raw=new JSONArray(prefs(c).getString("alarms","[]"));java.util.List<JSONObject> rows=new java.util.ArrayList<>();
  for(int i=0;i<raw.length();i++){JSONObject a=new JSONObject(raw.getJSONObject(i).toString());String shift=a.getString("shift");boolean night=shift.contains("야간");if(!night&&!shift.contains("주간"))continue;
- String time=wakeTime(c,night);String[] date=a.getString("date").split("-");String[] hm=time.split(":");
- java.util.Calendar cal=java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("Asia/Seoul"));cal.clear();cal.setLenient(false);cal.set(Integer.parseInt(date[0]),Integer.parseInt(date[1])-1,Integer.parseInt(date[2]),Integer.parseInt(hm[0]),Integer.parseInt(hm[1]),0);
- a.put("time",time);a.put("at",cal.getTimeInMillis());rows.add(a);}
+ String time=wakeTime(c,night);a.put("time",time);a.put("at",AlarmTime.at(a.getString("date"),time));rows.add(a);}
  java.util.Collections.sort(rows,(a,b)->Long.compare(a.optLong("at"),b.optLong("at")));JSONArray out=new JSONArray();for(JSONObject a:rows)out.put(a);return out;
  }
- static int countFuture(Context c){int n=0;try{JSONArray a=new JSONArray(prefs(c).getString("alarms","[]"));for(int i=0;i<a.length();i++)if(a.getJSONObject(i).getLong("at")>System.currentTimeMillis())n++;}catch(Exception ignored){}return n;}
+ static int countFuture(Context c){int n=0;try{JSONArray a=plan(c);for(int i=0;i<a.length();i++)if(a.getJSONObject(i).getLong("at")>System.currentTimeMillis())n++;}catch(Exception ignored){}return n;}
  static synchronized void restore(Context c){
   cancel(c,NEXT);prefs(c).edit().remove("next").apply();
   if(!prefs(c).getBoolean("enabled",false)||!exact(c))return;
-  try{JSONArray list=new JSONArray(prefs(c).getString("alarms","[]"));for(int n=0;n<list.length();n++){JSONObject a=list.getJSONObject(n);if(a.getLong("at")<=System.currentTimeMillis())continue;String label=a.getString("date")+" "+a.getString("time")+" "+a.getString("shift")+" · "+a.getString("source");set(c,NEXT,a.getLong("at"),label);prefs(c).edit().putString("next",label).apply();break;}}catch(Exception e){prefs(c).edit().putString("error","알람 예약 실패: "+e.getClass().getSimpleName()).apply();}
+  try{JSONArray list=plan(c);for(int n=0;n<list.length();n++){JSONObject a=list.getJSONObject(n);if(a.getLong("at")<=System.currentTimeMillis())continue;String label=a.getString("date")+" "+a.getString("time")+" "+a.getString("shift")+" · "+a.getString("source");set(c,NEXT,a.getLong("at"),label);prefs(c).edit().putString("next",label).apply();break;}}catch(Exception e){prefs(c).edit().putString("error","알람 예약 실패: "+e.getClass().getSimpleName()).apply();}
  }
  static JSONObject api(String action,String secret)throws Exception{
   HttpURLConnection cn=(HttpURLConnection)new URL("https://lqqjyedfwlqinppcrvjf.supabase.co/functions/v1/app-alarm").openConnection();
@@ -37,12 +35,33 @@ final class AlarmStore {
  private static final Object SYNC_LOCK=new Object();
  static String sync(Context c)throws Exception {synchronized(SYNC_LOCK){return syncInternal(c);}}
  private static String syncInternal(Context c)throws Exception {
-  String token=prefs(c).getString("token","");if(token.isEmpty())return "먼저 교대근무 앱에서 연결 코드를 발급해 주세요.";
-  try{JSONObject d=api("sync",token);JSONArray a=d.getJSONArray("alarms");for(int i=0;i<a.length();i++){JSONObject row=a.getJSONObject(i);row.getLong("at");row.getString("date");row.getString("time");row.getString("shift");row.getString("source");}
-   prefs(c).edit().putString("alarms",a.toString()).putString("workdays",d.optJSONArray("workdays")==null?"[]":d.getJSONArray("workdays").toString()).putString("name",d.getString("name")).putLong("synced",System.currentTimeMillis()).putString("error","").commit();restore(c);ShiftWidget.refresh(c);return "일정을 동기화했습니다.";
-  }catch(Revoked e){prefs(c).edit().remove("token").putBoolean("enabled",false).putString("error",e.getMessage()).commit();restore(c);cancel(c,SNOOZE);c.stopService(new Intent(c,RingService.class));ShiftWidget.refresh(c);throw e;}
-  catch(Exception e){prefs(c).edit().putString("error","동기화 실패 — 마지막으로 받은 일정 유지").apply();ShiftWidget.refresh(c);throw e;}
+  String token; synchronized(AlarmStore.class){token=prefs(c).getString("token","");}
+  if(token.isEmpty())return "먼저 교대근무 앱에서 연결 코드를 발급해 주세요.";
+  try{
+   JSONObject d=api("sync",token);JSONArray rows=d.getJSONArray("alarms");
+   for(int i=0;i<rows.length();i++){JSONObject row=rows.getJSONObject(i);row.getLong("at");row.getString("date");row.getString("time");row.getString("shift");row.getString("source");}
+   synchronized(AlarmStore.class){
+    if(!token.equals(prefs(c).getString("token","")))return "이전 연결의 응답을 무시했습니다.";
+    prefs(c).edit().putString("alarms",rows.toString()).putString("workdays",d.optJSONArray("workdays")==null?"[]":d.getJSONArray("workdays").toString()).putString("name",d.getString("name")).putLong("synced",System.currentTimeMillis()).putString("error","").commit();
+    restore(c);ShiftWidget.refresh(c);
+   }
+   return "일정을 동기화했습니다.";
+  }catch(Revoked e){
+   synchronized(AlarmStore.class){
+    if(!token.equals(prefs(c).getString("token","")))return "이전 연결의 응답을 무시했습니다.";
+    prefs(c).edit().remove("token").putBoolean("enabled",false).putString("error",e.getMessage()).commit();
+    restore(c);cancel(c,SNOOZE);c.stopService(new Intent(c,RingService.class));ShiftWidget.refresh(c);
+   }throw e;
+  }catch(Exception e){
+   synchronized(AlarmStore.class){
+    if(!token.equals(prefs(c).getString("token","")))return "이전 연결의 응답을 무시했습니다.";
+    prefs(c).edit().putString("error","동기화 실패 — 마지막으로 받은 일정 유지").apply();ShiftWidget.refresh(c);
+   }throw e;
+  }
  }
+ static synchronized void attach(Context c,String token,String name){stop(c);prefs(c).edit().putString("token",token).putString("name",name).putBoolean("enabled",true).remove("alarms").remove("workdays").remove("synced").commit();jobs(c);ShiftWidget.refresh(c);}
+ static synchronized void detach(Context c){stop(c);cancel(c,TEST);prefs(c).edit().clear().commit();jobs(c);ShiftWidget.refresh(c);}
+
  static void jobs(Context c){JobScheduler j=(JobScheduler)c.getSystemService(Context.JOB_SCHEDULER_SERVICE);if(prefs(c).getString("token","").isEmpty()){j.cancel(JOB);return;}j.schedule(new JobInfo.Builder(JOB,new ComponentName(c,SyncJob.class)).setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY).setPeriodic(15*60*1000L).setPersisted(true).build());}
  static void stop(Context c){prefs(c).edit().putBoolean("enabled",false).commit();restore(c);cancel(c,SNOOZE);c.stopService(new Intent(c,RingService.class));}
 }
