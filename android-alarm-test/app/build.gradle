@@ -3,7 +3,7 @@ def signingPath = System.getenv('ALARM_KEYSTORE_PATH')
 android {
  namespace 'io.github.gy7604.alarmtest'
  compileSdk 35
- defaultConfig { applicationId 'io.github.gy7604.alarmtest'; minSdk 23; targetSdk 35; versionCode 10; versionName '0.10-fixed-signing' }
+ defaultConfig { applicationId 'io.github.gy7604.alarmtest'; minSdk 23; targetSdk 35; versionCode 11; versionName '0.11-horizontal-widget' }
  signingConfigs {
   stable {
    if (signingPath) {
