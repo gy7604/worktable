@@ -1,7 +1,25 @@
 plugins { id 'com.android.application' }
+def signingPath = System.getenv('ALARM_KEYSTORE_PATH')
 android {
  namespace 'io.github.gy7604.alarmtest'
  compileSdk 35
- defaultConfig { applicationId 'io.github.gy7604.alarmtest'; minSdk 23; targetSdk 35; versionCode 9; versionName '0.9-week-widget' }
+ defaultConfig { applicationId 'io.github.gy7604.alarmtest'; minSdk 23; targetSdk 35; versionCode 10; versionName '0.10-fixed-signing' }
+ signingConfigs {
+  stable {
+   if (signingPath) {
+    storeFile file(signingPath)
+    storePassword System.getenv('ALARM_STORE_PASSWORD')
+    keyAlias System.getenv('ALARM_KEY_ALIAS')
+    keyPassword System.getenv('ALARM_KEY_PASSWORD')
+   }
+  }
+ }
+ buildTypes { release { signingConfig signingConfigs.stable; minifyEnabled false } }
  compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
+gradle.taskGraph.whenReady { graph ->
+ if (graph.allTasks.any { it.name.toLowerCase().contains('release') } &&
+     (!signingPath || !System.getenv('ALARM_STORE_PASSWORD') || !System.getenv('ALARM_KEY_ALIAS') || !System.getenv('ALARM_KEY_PASSWORD'))) {
+  throw new GradleException('Stable signing is required. Configure SHIFT_ALARM_SIGNING_JSON in GitHub Actions secrets.')
+ }
 }
