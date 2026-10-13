@@ -1,4 +1,4 @@
-import {schedule} from './schedule.mjs';
+import {schedule,workdays} from './schedule.mjs';
 const origin='https://gy7604.github.io';
 const headers={'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Headers':'authorization,apikey,x-client-info,content-type,x-app-session,x-alarm-token','Access-Control-Allow-Methods':'POST,OPTIONS','Content-Type':'application/json','Cache-Control':'no-store','Vary':'Origin'};
 const reply=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers});
@@ -29,7 +29,7 @@ Deno.serve(async(req:Request)=>{
   const data=await r.json();if(data.status!=='ok')return reply({success:false,message:'연결이 만료되었거나 해제되었습니다. 다시 연결해 주세요.'},401);
   if(b.action==='issue')return reply({success:true,code:secret,expires_minutes:10});
   if(b.action==='exchange')return reply({success:true,token:secret,name:data.name});
-  if(b.action==='sync')return reply({success:true,name:data.name,team:data.team,alarms:schedule(data),fetched_at:Date.now()});
+  if(b.action==='sync')return reply({success:true,name:data.name,team:data.team,alarms:schedule(data),workdays:workdays(data),fetched_at:Date.now()});
   return reply({success:true});
  }catch{return reply({success:false,message:'일정을 불러오지 못했습니다.'},503);}
 });
