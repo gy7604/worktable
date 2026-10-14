@@ -126,9 +126,10 @@ function applyDailyChanges(base,date,records,team=selectedTeam){
   if(base.shift==='O'||base.shift==='U')return {...base};
   const shift=base.shift==='D'?'주간':'야간';
   const members=TEAMS[team].members;
+  const fieldManagers=new Set(['임병철','백승학','김철종','주영훈']);
   const rows=records.filter(r=>members.includes(r.requested_by) && r.team===team && r.shift_date===dateKey(date) && r.shift_type===shift && r.request_kind!=='support' && !/정수|지원/.test(String(r.reason||'')) && !['CANCELLED','CANCELED','DELETED'].includes(r.status));
   const off=new Set(rows.map(r=>r.requested_by).filter(n=>members.includes(n)));
-  const helpers=[...new Set(rows.filter(r=>r.status==='FILLED'&&r.filled_by&&!members.includes(r.filled_by)).map(r=>String(r.filled_by)))];
+  const helpers=[...new Set(rows.filter(r=>r.status==='FILLED'&&r.filled_by&&!members.includes(r.filled_by)&&!fieldManagers.has(String(r.filled_by).trim())).map(r=>String(r.filled_by)))];
   if(!off.size&&!helpers.length)return {...base};
   const result={...base,changed:true,off:[...off]};
     function unconfirmed(message){
