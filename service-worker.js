@@ -1,11 +1,13 @@
-const CACHE_NAME='worktable-v17';
+const CACHE_NAME='worktable-v18';
+let migrateOldPage=false;
 const ASSETS=['./','./index.html','./manifest.json','./icons/icon-192.png','./icons/icon-512.png'];
 self.addEventListener('install',event=>{
   event.waitUntil((async()=>{
     const keys=await caches.keys();
-    await (await caches.open(CACHE_NAME)).addAll(ASSETS);
+    await (await caches.open(CACHE_NAME)).addAll(ASSETS.map(url=>new Request(url,{cache:'reload'})));
     // One-time migration: older pages have no update button.
-    if(keys.some(key=>/^worktable-v[1-6]$/.test(key)))await self.skipWaiting();
+    migrateOldPage=keys.some(key=>/^worktable-v(?:[1-9]|1[0-7])$/.test(key));
+    if(migrateOldPage)await self.skipWaiting();
   })());
 });
 self.addEventListener('message',event=>{
@@ -16,6 +18,10 @@ self.addEventListener('activate',event=>{
     const keys=await caches.keys();
     await Promise.all(keys.filter(key=>key.startsWith('worktable-')&&key!==CACHE_NAME).map(key=>caches.delete(key)));
     await self.clients.claim();
+    if(migrateOldPage){
+      const windows=await self.clients.matchAll({type:'window'});
+      await Promise.all(windows.filter(client=>new URL(client.url).pathname.startsWith('/worktable/')).map(client=>client.navigate(client.url).catch(()=>{})));
+    }
   })());
 });
 self.addEventListener('fetch',event=>{
