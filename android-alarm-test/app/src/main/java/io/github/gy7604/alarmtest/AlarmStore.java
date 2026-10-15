@@ -24,10 +24,10 @@ final class AlarmStore {
  static JSONObject api(String action,String secret)throws Exception{
   HttpURLConnection cn=(HttpURLConnection)new URL("https://lqqjyedfwlqinppcrvjf.supabase.co/functions/v1/app-alarm").openConnection();
   try{cn.setRequestMethod("POST");cn.setConnectTimeout(10000);cn.setReadTimeout(15000);cn.setDoOutput(true);cn.setRequestProperty("Content-Type","application/json");if(action.equals("sync"))cn.setRequestProperty("x-alarm-token",secret);
-   JSONObject body=new JSONObject().put("action",action);if(action.equals("exchange"))body.put("code",secret);
+   JSONObject body=new JSONObject().put("action",action);if(action.equals("sync"))body.put("widget",true);if(action.equals("exchange"))body.put("code",secret);
    try(OutputStream o=cn.getOutputStream()){o.write(body.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));}
    int code=cn.getResponseCode();if(code==401)throw new Revoked();if(code!=200)throw new IOException("서버에 연결하지 못했습니다 ("+code+")");
-   ByteArrayOutputStream bytes=new ByteArrayOutputStream();try(InputStream in=cn.getInputStream()){byte[] buf=new byte[4096];int n;while((n=in.read(buf))!=-1){bytes.write(buf,0,n);if(bytes.size()>131072)throw new IOException("응답 크기 초과");}}
+   ByteArrayOutputStream bytes=new ByteArrayOutputStream();try(InputStream in=cn.getInputStream()){byte[] buf=new byte[4096];int n;while((n=in.read(buf))!=-1){bytes.write(buf,0,n);if(bytes.size()>524288)throw new IOException("응답 크기 초과");}}
    JSONObject data=new JSONObject(bytes.toString("UTF-8"));if(!data.optBoolean("success"))throw new IOException("연결 실패");return data;
   }finally{cn.disconnect();}
  }
@@ -43,6 +43,8 @@ final class AlarmStore {
    synchronized(AlarmStore.class){
     if(!token.equals(prefs(c).getString("token","")))return "이전 연결의 응답을 무시했습니다.";
     prefs(c).edit().putString("alarms",rows.toString()).putString("workdays",d.optJSONArray("workdays")==null?"[]":d.getJSONArray("workdays").toString()).putString("name",d.getString("name")).putLong("synced",System.currentTimeMillis()).putString("error","").commit();
+    if(d.optJSONArray("widget_requests")!=null)prefs(c).edit().putString("widget_requests",d.getJSONArray("widget_requests").toString()).putLong("widget_synced",System.currentTimeMillis()).putString("widget_error","").commit();
+    else prefs(c).edit().putString("widget_error",d.optString("widget_error","위젯 정보를 갱신하지 못했습니다.")).commit();
     restore(c);ShiftWidget.refresh(c);
    }
    return "일정을 동기화했습니다.";
@@ -59,7 +61,7 @@ final class AlarmStore {
    }throw e;
   }
  }
- static synchronized void attach(Context c,String token,String name){stop(c);prefs(c).edit().putString("token",token).putString("name",name).putBoolean("enabled",true).remove("alarms").remove("workdays").remove("synced").commit();jobs(c);ShiftWidget.refresh(c);}
+ static synchronized void attach(Context c,String token,String name){stop(c);prefs(c).edit().putString("token",token).putString("name",name).putBoolean("enabled",true).remove("alarms").remove("workdays").remove("synced").remove("widget_requests").remove("widget_synced").remove("widget_error").commit();jobs(c);ShiftWidget.refresh(c);}
  static synchronized void detach(Context c){stop(c);cancel(c,TEST);prefs(c).edit().clear().commit();jobs(c);ShiftWidget.refresh(c);}
 
  static void jobs(Context c){JobScheduler j=(JobScheduler)c.getSystemService(Context.JOB_SCHEDULER_SERVICE);if(prefs(c).getString("token","").isEmpty()){j.cancel(JOB);return;}j.schedule(new JobInfo.Builder(JOB,new ComponentName(c,SyncJob.class)).setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY).setPeriodic(15*60*1000L).setPersisted(true).build());}
