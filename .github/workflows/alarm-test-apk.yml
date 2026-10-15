@@ -32,6 +32,8 @@ jobs:
           node android-alarm-test/backend/widget.test.mjs
           javac -d /tmp/alarm-time-tests android-alarm-test/app/src/main/java/io/github/gy7604/alarmtest/AlarmTime.java android-alarm-test/tests/AlarmTimeRegression.java
           java -cp /tmp/alarm-time-tests io.github.gy7604.alarmtest.AlarmTimeRegression
+          javac -d /tmp/alarm-cycle-tests android-alarm-test/app/src/main/java/io/github/gy7604/alarmtest/AlarmTime.java android-alarm-test/app/src/main/java/io/github/gy7604/alarmtest/ShiftCycle.java android-alarm-test/tests/ShiftCycleRegression.java
+          java -cp /tmp/alarm-cycle-tests io.github.gy7604.alarmtest.ShiftCycleRegression
           status=$(curl --silent --show-error --max-time 30 --output /tmp/alarm-api.json --write-out '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"action":"sync"}' https://lqqjyedfwlqinppcrvjf.supabase.co/functions/v1/app-alarm)
           test "$status" = "401"
           status=$(curl --silent --show-error --max-time 30 --output /tmp/alarm-api.json --write-out '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"action":"exchange","code":"invalid"}' https://lqqjyedfwlqinppcrvjf.supabase.co/functions/v1/app-alarm)
@@ -61,11 +63,6 @@ jobs:
       - name: Build and lint
         working-directory: android-alarm-test
         run: gradle assembleRelease lintRelease --no-daemon
-      - uses: actions/upload-artifact@v4
-        with:
-          name: shift-alarm-signed-apk
-          path: android-alarm-test/app/build/outputs/apk/release/app-release.apk
-          retention-days: 30
       - name: Create update metadata
         run: |
           python3 - <<'PY'
