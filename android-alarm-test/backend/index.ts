@@ -29,7 +29,20 @@ Deno.serve(async(req:Request)=>{
   const data=await r.json();if(data.status!=='ok')return reply({success:false,message:'연결이 만료되었거나 해제되었습니다. 다시 연결해 주세요.'},401);
   if(b.action==='issue')return reply({success:true,code:secret,expires_minutes:10});
   if(b.action==='exchange')return reply({success:true,token:secret,name:data.name});
-  if(b.action==='sync')return reply({success:true,name:data.name,team:data.team,alarms:schedule(data),workdays:workdays(data),fetched_at:Date.now()});
+  if(b.action==='sync'){
+   let widget:Record<string,unknown>={};
+   if(b.widget===true){
+    try{
+     const end=new Date(Date.parse(data.today+'T00:00:00Z')+31*86400000).toISOString().slice(0,10);
+     const query=new URLSearchParams({select:'shift_date,team,shift_type,request_kind,requested_by,filled_by,status',and:'(shift_date.gte.'+data.today+',shift_date.lt.'+end+')',team:'in.(A,B,C,D)',order:'shift_date.asc,team.asc,id.asc',limit:'1000'});
+     const wr=await fetch(url+'/rest/v1/requests?'+query,{headers:{apikey:key,Authorization:'Bearer '+key},signal:AbortSignal.timeout(8000)});
+     if(!wr.ok)throw new Error('widget query');
+     const rows=await wr.json();if(!Array.isArray(rows)||rows.length>=1000)throw new Error('widget limit');
+     widget={widget_requests:rows,widget_error:''};
+    }catch{widget={widget_error:'휴무·대근 정보를 갱신하지 못했습니다.'};}
+   }
+   return reply({success:true,name:data.name,team:data.team,alarms:schedule(data),workdays:workdays(data),...widget,fetched_at:Date.now()});
+  }
   return reply({success:true});
  }catch{return reply({success:false,message:'일정을 불러오지 못했습니다.'},503);}
 });
