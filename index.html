@@ -614,6 +614,28 @@ function applyDailyChanges(base,date,records,team=selectedTeam){
   const forbidden=(a,b)=>team==='B'&&[a,b].includes('강신혁')&&[a,b].includes('장경준');
   let pair=null;
   for(const a of first){for(const b of second)if(a!==b&&!forbidden(a,b)){pair=[a,b];break;}if(pair)break;}
+  // Reserve the sole available field worker for 청정 when two of three are off.
+  const fieldWorkers=members.filter(n=>n!==base.ccr1&&n!==base.ccr2);
+  if(fieldWorkers.length===3&&fieldWorkers.filter(n=>off.has(n)).length===2){
+    const remainingField=fieldWorkers.find(n=>!off.has(n));
+    const ccrPairReady=!!pair&&!pair.includes(remainingField);
+    if(ccrPairReady){result.ccr1=pair[0];result.ccr2=pair[1];}
+    else{
+      // Never duplicate the sole field worker across CCR and 청정.
+      result.ccr1=off.has(base.ccr1)?'당일 확인':base.ccr1;
+      result.ccr2=off.has(base.ccr2)?'당일 확인':base.ccr2;
+      if(forbidden(result.ccr1,result.ccr2)){
+        result.ccr1='당일 확인';result.ccr2='당일 확인';
+      }
+    }
+    result.kiln='당일 확인';
+    result.pellet=ccrPairReady&&helpers.length===1?helpers[0]:helpers.length===0?'대근자 미정':'당일 확인';
+    result.clean=remainingField;
+    result.note=ccrPairReady
+      ? '현장 2명 휴무 · 잔여 1명 청정 배치 · 나머지 현장 배치 확인 필요'
+      : '현장 2명 휴무 · 잔여 1명 청정 배치 · CCR 및 나머지 현장 배치 확인 필요';
+    return result;
+  }
   if(!pair)return unconfirmed('CCR 배치 가능한 조합 없음 · 관리자 확인 필요');
   result.ccr1=pair[0];result.ccr2=pair[1];
   if(off.size>=2){
