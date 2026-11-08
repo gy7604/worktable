@@ -324,10 +324,10 @@ public class MainActivity extends Activity {
   parent.addView(v,lp);
  }
  private void addPair(LinearLayout row,View a,View b,int gap){
-  row.addView(a,new LinearLayout.LayoutParams(0,-1,1f));
+  row.addView(a,new LinearLayout.LayoutParams(0,-2,1f));
   View spacer=new View(this);
   row.addView(spacer,new LinearLayout.LayoutParams(dp(gap),1));
-  row.addView(b,new LinearLayout.LayoutParams(0,-1,1f));
+  row.addView(b,new LinearLayout.LayoutParams(0,-2,1f));
  }
  private TextView solidAction(String text,boolean primary){
   TextView v=label(text,15,primary?WHITE:BLUE,true);
