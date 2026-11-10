@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8').replace(/\r\n/g, '\n');
 const begin = html.indexOf('const TEAMS={');
 const end = html.indexOf('// =============================================\n// 앱 상태', begin);
 assert.ok(begin !== -1 && end > begin, 'assignment logic must be present');
